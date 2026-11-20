@@ -30,7 +30,7 @@ public class SettingsActivity extends Activity {
         setContentView(R.layout.activity_settings);
         status = findViewById(R.id.status);
         selfState = findViewById(R.id.selfState);
-        findViewById(R.id.btnChrome).setOnClickListener(v -> launchChrome());
+        findViewById(R.id.btnChrome).setOnClickListener(v -> confirmOpenChrome());
         findViewById(R.id.btnBack).setOnClickListener(v -> finish());
         defaultState = findViewById(R.id.defaultState);
         findViewById(R.id.rowDefault).setOnClickListener(v -> askDefaultBrowser());
@@ -93,6 +93,27 @@ public class SettingsActivity extends Activity {
                     toast("복사했습니다");
                 })
                 .setNegativeButton("닫기", null)
+                .show();
+    }
+
+    /** Chrome 에서 연 페이지는 크롬뷰가 붙잡지 못한다는 점을 알리고 나서 Chrome 을 연다. */
+    private void confirmOpenChrome() {
+        SharedPreferences prefs = getSharedPreferences("app", MODE_PRIVATE);
+        if (!prefs.getBoolean("usePinned", true) || prefs.getBoolean("chromeWarnOff", false)) {
+            launchChrome();
+            return;
+        }
+        new AlertDialog.Builder(this)
+                .setTitle("Chrome으로 나가기")
+                .setMessage("Chrome에서 연 페이지는 크롬뷰가 붙잡지 못합니다. 또 인증 앱은 인증을 마치면 "
+                        + "기본 브라우저인 크롬뷰로 돌아오는데, 그 페이지는 Chrome에 있어서 오류가 납니다.\n\n"
+                        + "인증이 필요한 사이트는 크롬뷰 홈의 주소창에 입력해서 열어 주세요.")
+                .setPositiveButton("Chrome 열기", (d, w) -> launchChrome())
+                .setNegativeButton("취소", null)
+                .setNeutralButton("다시 묻지 않기", (d, w) -> {
+                    prefs.edit().putBoolean("chromeWarnOff", true).apply();
+                    launchChrome();
+                })
                 .show();
     }
 

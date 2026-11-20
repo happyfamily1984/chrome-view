@@ -129,7 +129,7 @@ public class MainActivity extends Activity {
         findViewById(R.id.btnTabs).setOnClickListener(v -> goHome());
         findViewById(R.id.btnMenu).setOnClickListener(this::showMenu);
         findViewById(R.id.btnSettings).setOnClickListener(v -> openSettings());
-        findViewById(R.id.btnChrome).setOnClickListener(v -> launchChrome());
+        findViewById(R.id.btnChrome).setOnClickListener(v -> confirmOpenChrome());
         urlBox.setOnEditorActionListener((v, actionId, event) -> {
             if (actionId == EditorInfo.IME_ACTION_GO || actionId == EditorInfo.IME_NULL) {
                 String text = urlBox.getText().toString().trim();
@@ -258,7 +258,13 @@ public class MainActivity extends Activity {
                 url = m.find() ? m.group() : toUrl(text.trim());
             }
         }
-        if (url == null || !(url.startsWith("http://") || url.startsWith("https://"))) return false;
+        if (url == null || !(url.startsWith("http://") || url.startsWith("https://"))) {
+            if (!Intent.ACTION_MAIN.equals(intent.getAction()) && !ACTION_OPEN.equals(intent.getAction())) {
+                Diag.log(this, "열 수 없는 요청을 받음: " + intent.getAction()
+                        + " · " + (url == null ? "주소 없음" : Diag.brief(url)));
+            }
+            return false;
+        }
         leaveUrlBox();
         // 인증 앱이 '원래 페이지로 돌아가기'로 같은 주소를 다시 보내는 경우가 있다. 새로 열면
         // 인증 전 상태의 새 페이지가 떠 버리므로, 이미 그 주소를 연 탭이 있으면 그 탭을 그대로 보여 준다.
@@ -306,6 +312,27 @@ public class MainActivity extends Activity {
         startActivity(new Intent(this, SettingsActivity.class));
     }
 
+    /** Chrome 에서 연 페이지는 크롬뷰가 붙잡지 못한다는 점을 알리고 나서 Chrome 을 연다. */
+    private void confirmOpenChrome() {
+        SharedPreferences prefs = getSharedPreferences("app", MODE_PRIVATE);
+        if (!prefs.getBoolean("usePinned", true) || prefs.getBoolean("chromeWarnOff", false)) {
+            launchChrome();
+            return;
+        }
+        new AlertDialog.Builder(this)
+                .setTitle("Chrome으로 나가기")
+                .setMessage("Chrome에서 연 페이지는 크롬뷰가 붙잡지 못합니다. 또 인증 앱은 인증을 마치면 "
+                        + "기본 브라우저인 크롬뷰로 돌아오는데, 그 페이지는 Chrome에 있어서 오류가 납니다.\n\n"
+                        + "인증이 필요한 사이트는 크롬뷰 홈의 주소창에 입력해서 열어 주세요.")
+                .setPositiveButton("Chrome 열기", (d, w) -> launchChrome())
+                .setNegativeButton("취소", null)
+                .setNeutralButton("다시 묻지 않기", (d, w) -> {
+                    prefs.edit().putBoolean("chromeWarnOff", true).apply();
+                    launchChrome();
+                })
+                .show();
+    }
+
     private boolean launchChrome() {
         Intent i = getPackageManager().getLaunchIntentForPackage(KeepAliveService.CHROME);
         try {
@@ -326,7 +353,7 @@ public class MainActivity extends Activity {
         boolean unrestricted = getSystemService(PowerManager.class)
                 .isIgnoringBatteryOptimizations(getPackageName());
         status.setText(unrestricted
-                ? "유지 켜짐 · 여기서 연 페이지는 다른 앱을 다녀와도 그대로 남습니다."
+                ? "유지 켜짐 · 인증할 사이트는 위 주소창에 입력해서 여세요. 여기서 연 페이지만 다른 앱을 다녀와도 그대로 남습니다."
                 : "배터리 절전이 걸려 있어 페이지가 닫힐 수 있습니다. 여기를 눌러 설정에서 '제한 없음'으로 바꿔 주세요.");
         status.setOnClickListener(unrestricted ? null : v -> openSettings());
         status.setClickable(!unrestricted);

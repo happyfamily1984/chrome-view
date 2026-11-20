@@ -15,6 +15,9 @@ public class LinkActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         KeepAliveService.start(this);
+        Diag.log(this, "다른 앱이 크롬뷰를 부름: " + getIntent().getAction() + " · "
+                + (getIntent().getData() == null ? "주소 없음" : Diag.brief(getIntent().getDataString()))
+                + (getReferrer() != null ? " · 보낸 앱 " + getReferrer().getHost() : ""));
         Uri data = getIntent().getData();
         boolean share = Intent.ACTION_SEND.equals(getIntent().getAction());
         boolean pinned = getSharedPreferences("app", MODE_PRIVATE).getBoolean("usePinned", true);
