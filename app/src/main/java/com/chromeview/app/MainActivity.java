@@ -26,7 +26,6 @@ import android.webkit.CookieManager;
 import android.webkit.GeolocationPermissions;
 import android.webkit.PermissionRequest;
 import android.webkit.RenderProcessGoneDetail;
-import android.webkit.URLUtil;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
@@ -305,11 +304,18 @@ public class MainActivity extends Activity {
     private Tab findByUrl(String url) {
         String want = stripFragment(url);
         Tab cur = tm.current();
-        if (cur != null && stripFragment(cur.url).equals(want)) return cur;
+        if (cur != null && want.equals(shownUrl(cur))) return cur;
         for (int i = tm.tabs.size() - 1; i >= 0; i--) {
-            if (stripFragment(tm.tabs.get(i).url).equals(want)) return tm.tabs.get(i);
+            if (want.equals(shownUrl(tm.tabs.get(i)))) return tm.tabs.get(i);
         }
         return null;
+    }
+
+    /** 그 탭에 실제로 떠 있는 페이지의 주소. 아무 페이지도 뜨지 않은 탭(파일 링크 등)은 null. */
+    private static String shownUrl(Tab t) {
+        if (t.web == null) return t.saved != null ? stripFragment(t.url) : null;
+        String u = t.web.getUrl();
+        return u == null ? null : stripFragment(u);
     }
 
     private static String stripFragment(String url) {
@@ -696,7 +702,7 @@ public class MainActivity extends Activity {
         t.web.setWebViewClient(new TabClient(t));
         t.web.setWebChromeClient(new TabChrome(t));
         t.web.setDownloadListener((url, userAgent, disposition, mime, length) ->
-                download(url, userAgent, disposition, mime));
+                download(t, url, userAgent, disposition, mime));
     }
 
     private boolean isShowing(Tab t) {
@@ -928,13 +934,48 @@ public class MainActivity extends Activity {
         toast("이 링크를 열 수 있는 앱이 설치되어 있지 않습니다");
     }
 
-    private void download(String url, String userAgent, String disposition, String mime) {
+    /** 서버가 알려 준 이름 → 주소의 마지막 부분 순으로 파일 이름을 정한다. 확장자는 건드리지 않는다. */
+    private static String fileName(String url, String disposition, String mime) {
+        String name = null;
+        if (disposition != null) {
+            Matcher m = Pattern.compile("filename\\*?=(?:UTF-8'')?\"?([^\";]+)\"?",
+                    Pattern.CASE_INSENSITIVE).matcher(disposition);
+            if (m.find()) name = Uri.decode(m.group(1).trim());
+        }
+        if (name == null || name.isEmpty()) name = Uri.parse(url).getLastPathSegment();
+        if (name == null || name.isEmpty()) name = "download";
+        name = name.replaceAll("[\\\\/:*?\"<>|]", "_");
+        if (!name.contains(".")) {
+            String ext = android.webkit.MimeTypeMap.getSingleton().getExtensionFromMimeType(mime);
+            if (ext != null) name += "." + ext;
+        }
+        return name;
+    }
+
+    private void download(Tab tab, String url, String userAgent, String disposition, String mime) {
+        // 파일 링크만 받고 아무 페이지도 뜨지 않은 빈 탭은 닫고 원래 화면으로 돌아간다.
+        if (tab.web != null && tab.web.copyBackForwardList().getSize() == 0) {
+            boolean wasShowing = isShowing(tab);
+            Tab opener = tm.byId(tab.openerId);
+            closeTab(tab);
+            if (wasShowing && opener != null) show(opener);
+            else if (wasShowing) goHome();
+            else render();
+        }
         if (!url.matches("(?i)^https?://.*")) {
             toast("이 형식의 파일은 내려받을 수 없습니다. 메뉴의 'Chrome으로 열기'를 이용해 주세요");
             return;
         }
         try {
-            String name = URLUtil.guessFileName(url, disposition, mime);
+            String name = fileName(url, disposition, mime);
+            // 서버가 형식을 뭉뚱그려 보내면(octet-stream 등) 확장자로 알아낸다. 그래야 받은 APK 를 눌러 설치할 수 있다.
+            int dot = name.lastIndexOf('.');
+            String byExt = dot < 0 ? null : android.webkit.MimeTypeMap.getSingleton()
+                    .getMimeTypeFromExtension(name.substring(dot + 1).toLowerCase());
+            if (byExt != null && (mime == null || mime.isEmpty() || mime.startsWith("application/octet-stream")
+                    || mime.startsWith("text/plain") || mime.startsWith("binary/"))) {
+                mime = byExt;
+            }
             DownloadManager.Request req = new DownloadManager.Request(Uri.parse(url));
             if (mime != null && !mime.isEmpty()) req.setMimeType(mime);
             String cookies = CookieManager.getInstance().getCookie(url);
