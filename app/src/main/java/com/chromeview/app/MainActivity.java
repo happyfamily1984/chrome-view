@@ -291,7 +291,11 @@ public class MainActivity extends Activity {
         Tab waiting = System.currentTimeMillis() - waitingSince < 15 * 60_000 ? tm.byId(waitingTabId) : null;
         Diag.log(this, "외부에서 링크 받음 → 새 탭" + (waiting != null ? "(인증 대기 탭과 연결)" : "")
                 + ": " + Diag.brief(url));
-        show(tm.create(url, waiting != null ? waiting.id : -1));
+        Tab before = tm.atHome ? null : tm.current();
+        Tab opened = tm.create(url, waiting != null ? waiting.id : -1);
+        opened.external = waiting == null;
+        opened.backToId = before == null ? -1 : before.id;
+        show(opened);
         return true;
     }
 
@@ -531,11 +535,7 @@ public class MainActivity extends Activity {
             return;
         }
         if (tm.atHome) {
-            new AlertDialog.Builder(this)
-                    .setMessage("앱을 종료하겠습니까?")
-                    .setPositiveButton("예", (d, w) -> exitApp())
-                    .setNegativeButton("아니오", null)
-                    .show();
+            confirmExit();
             return;
         }
         Tab t = tm.current();
@@ -549,7 +549,26 @@ public class MainActivity extends Activity {
             show(opener);
             return;
         }
-        goHome();
+        if (t.external) {
+            // 다른 앱에서 넘어온 탭: 탭을 닫고 그 앱으로 돌아간다. 크롬뷰에는 그 전에 보던 화면을 남겨 둔다.
+            Tab before = tm.byId(t.backToId);
+            closeTab(t);
+            if (before != null) tm.select(before);
+            else tm.atHome = true;
+            render();
+            moveTaskToBack(true);
+            return;
+        }
+        // 더 돌아갈 곳이 없는 탭: 홈 화면으로 보내지 않고 종료 여부를 묻는다. 홈은 홈 버튼으로만 간다.
+        confirmExit();
+    }
+
+    private void confirmExit() {
+        new AlertDialog.Builder(this)
+                .setMessage("앱을 종료하겠습니까?")
+                .setPositiveButton("예", (d, w) -> exitApp())
+                .setNegativeButton("아니오", null)
+                .show();
     }
 
     /** 종료해도 탭과 로그인 쿠키는 저장되어 다음 실행 때 되살아난다. */
