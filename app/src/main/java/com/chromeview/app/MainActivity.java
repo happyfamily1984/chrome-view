@@ -409,18 +409,43 @@ public class MainActivity extends Activity {
                     if (!q.isEmpty()) {
                         List<String[]> all = new ArrayList<>();
                         try {
+                            // 즐겨찾기는 방문 3번으로 쳐서 조금 앞세운다.
                             for (Favorites.Item f : new ArrayList<>(favorites.items)) {
-                                all.add(new String[]{f.title, f.url});
+                                all.add(new String[]{f.title, f.url, "3"});
                             }
                         } catch (RuntimeException ignored) {
                         }
                         all.addAll(history.snapshot());
-                        java.util.Set<String> seen = new java.util.HashSet<>();
+
+                        // 1) 입력한 글자로 시작하는 사이트를 자주 간 순서로 맨 위에 둔다.
+                        java.util.Map<String, Integer> visits = new java.util.HashMap<>();
+                        java.util.Map<String, String> rootOf = new java.util.HashMap<>();
                         for (String[] it : all) {
-                            if (out.size() >= 8) break;
-                            String bare = it[1].replaceFirst("(?i)^https?://(www\\.|m\\.)?", "").toLowerCase();
-                            if ((bare.contains(q) || it[0].toLowerCase().contains(q)) && seen.add(it[1])) {
-                                out.add(it);
+                            Uri u = Uri.parse(it[1]);
+                            if (u.getHost() == null) continue;
+                            String bare = u.getHost().toLowerCase().replaceFirst("^(www|m)\\.", "");
+                            if (!bare.startsWith(q)) continue;
+                            visits.merge(bare, Integer.parseInt(it[2]), Integer::sum);
+                            if (!rootOf.containsKey(bare)) rootOf.put(bare, u.getScheme() + "://" + u.getHost() + "/");
+                        }
+                        List<String> sites = new ArrayList<>(visits.keySet());
+                        sites.sort((x, y) -> visits.get(y) - visits.get(x));
+                        java.util.Set<String> seen = new java.util.HashSet<>();
+                        for (String site : sites) {
+                            if (out.size() >= 3) break;
+                            out.add(new String[]{site, rootOf.get(site)});
+                            seen.add(rootOf.get(site));
+                        }
+
+                        // 2) 주소나 제목이 그 글자로 시작하는 페이지, 3) 중간에 들어 있는 페이지 순.
+                        for (int pass = 0; pass < 2; pass++) {
+                            for (String[] it : all) {
+                                if (out.size() >= 8) break;
+                                String bare = it[1].replaceFirst("(?i)^https?://(www\\.|m\\.)?", "").toLowerCase();
+                                String title = it[0].toLowerCase();
+                                boolean hit = pass == 0 ? bare.startsWith(q) || title.startsWith(q)
+                                        : bare.contains(q) || title.contains(q);
+                                if (hit && seen.add(it[1])) out.add(it);
                             }
                         }
                     }

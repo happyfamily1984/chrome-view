@@ -11,8 +11,8 @@ android {
         minSdk 26
         // 34를 유지: 35부터는 화면 전체(edge-to-edge) 강제와 포그라운드 서비스 시간 제한이 생긴다.
         targetSdk 34
-        versionCode 9
-        versionName "2.6"
+        versionCode 10
+        versionName "2.7"
     }
 
     // 저장소에는 서명 키를 두지 않는다. app/chromeview.keystore 가 있으면 그 키로,
