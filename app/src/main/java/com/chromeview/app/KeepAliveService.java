@@ -9,7 +9,9 @@ import android.content.Intent;
 import android.content.ServiceConnection;
 import android.content.pm.ServiceInfo;
 import android.os.Build;
+import android.os.Handler;
 import android.os.IBinder;
+import android.os.Looper;
 
 /**
  * 알림을 띄운 포그라운드 서비스.
@@ -31,26 +33,84 @@ public class KeepAliveService extends Service {
 
         @Override
         public void onServiceDisconnected(ComponentName name) {
-            // Chrome 이 죽은 경우. BIND_AUTO_CREATE 라 시스템이 다시 띄우면 재연결된다.
+            // Chrome 이 죽은 경우. 시스템이 다시 띄우면 재연결되지만, 확실히 하려고 직접 다시 건다.
             holdingChrome = false;
+            handler.postDelayed(KeepAliveService.this::rebind, 1000);
+        }
+
+        @Override
+        public void onBindingDied(ComponentName name) {
+            // Chrome 이 업데이트되는 등 연결 자체가 무효가 된 경우: 새로 연결해야 한다.
+            holdingChrome = false;
+            handler.postDelayed(KeepAliveService.this::rebind, 1000);
+        }
+
+        @Override
+        public void onNullBinding(ComponentName name) {
+            holdingChrome = false;
+        }
+    };
+
+    private final Handler handler = new Handler(Looper.getMainLooper());
+    private boolean destroyed;
+    /** 연결이 조용히 끊긴 채 방치되지 않도록 주기적으로 확인한다. */
+    private final Runnable watchdog = new Runnable() {
+        @Override
+        public void run() {
+            if (destroyed) return;
+            if (!holdingChrome) rebind();
+            handler.postDelayed(this, 60_000);
         }
     };
 
     @Override
     public void onCreate() {
         super.onCreate();
+        bind();
+        handler.postDelayed(watchdog, 60_000);
+    }
+
+    private void bind() {
         try {
+            // IMPORTANT: Chrome 을 크롬뷰(알림 떠 있는 서비스)와 같은 등급으로 끌어올린다.
+            // ABOVE_CLIENT: 메모리가 모자라면 Chrome 보다 크롬뷰가 먼저 정리 대상이 되게 한다.
             bound = bindService(
                     new Intent("android.support.customtabs.action.CustomTabsService").setPackage(CHROME),
-                    chrome, BIND_AUTO_CREATE | BIND_IMPORTANT);
+                    chrome, BIND_AUTO_CREATE | BIND_IMPORTANT | BIND_ABOVE_CLIENT);
         } catch (RuntimeException e) {
             bound = false;
         }
+        if (!bound) {
+            // bindService 가 false 여도 연결 객체는 등록된 상태라 반드시 풀어 줘야 한다.
+            try {
+                unbindService(chrome);
+            } catch (RuntimeException ignored) {
+            }
+        }
+    }
+
+    private void rebind() {
+        if (destroyed || holdingChrome) return;
+        if (bound) {
+            try {
+                unbindService(chrome);
+            } catch (RuntimeException ignored) {
+            }
+            bound = false;
+        }
+        bind();
     }
 
     @Override
     public void onDestroy() {
-        if (bound) unbindService(chrome);
+        destroyed = true;
+        handler.removeCallbacksAndMessages(null);
+        if (bound) {
+            try {
+                unbindService(chrome);
+            } catch (RuntimeException ignored) {
+            }
+        }
         bound = false;
         holdingChrome = false;
         super.onDestroy();

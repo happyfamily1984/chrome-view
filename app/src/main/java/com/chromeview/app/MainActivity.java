@@ -3,6 +3,7 @@ package com.chromeview.app;
 import android.Manifest;
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.app.role.RoleManager;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -23,7 +24,7 @@ import android.widget.Toast;
 public class MainActivity extends Activity {
     static final String ACTION_SETTINGS = "com.chromeview.app.SETTINGS";
 
-    private TextView status, selfState;
+    private TextView status, selfState, defaultState;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -50,7 +51,12 @@ public class MainActivity extends Activity {
             // 이 화면을 닫아 두어야 다음에 아이콘을 눌렀을 때 곧바로 Chrome 이 열린다.
             if (launchChrome() && prefs.getBoolean("autoChrome", true)) finish();
         });
+        defaultState = findViewById(R.id.defaultState);
+        findViewById(R.id.rowDefault).setOnClickListener(v -> askDefaultBrowser());
         findViewById(R.id.rowSelf).setOnClickListener(v -> askBatteryExemption());
+        Switch boot = findViewById(R.id.autoStart);
+        boot.setChecked(prefs.getBoolean("autoStart", true));
+        boot.setOnCheckedChangeListener((b, on) -> prefs.edit().putBoolean("autoStart", on).apply());
         findViewById(R.id.rowChrome).setOnClickListener(v -> openChromeBatterySettings());
         Switch auto = findViewById(R.id.autoChrome);
         auto.setChecked(prefs.getBoolean("autoChrome", true));
@@ -81,6 +87,7 @@ public class MainActivity extends Activity {
         boolean unrestricted = getSystemService(PowerManager.class)
                 .isIgnoringBatteryOptimizations(getPackageName());
         selfState.setText(unrestricted ? "완료" : "설정하기");
+        defaultState.setText(isDefaultBrowser() ? "완료" : "설정하기");
         if (getPackageManager().getLaunchIntentForPackage(KeepAliveService.CHROME) == null) {
             status.setText("Chrome 앱을 찾을 수 없습니다. Chrome을 설치하거나 사용 설정해 주세요.");
         } else if (!KeepAliveService.holdingChrome) {
@@ -128,7 +135,8 @@ public class MainActivity extends Activity {
                         + "Chrome 페이지가 처음으로 돌아가 있습니다.\n\n"
                         + "1. 다음 화면에서 '허용'을 눌러 크롬뷰를 배터리 제한 없음으로 둡니다.\n"
                         + "2. 이 화면의 'Chrome 배터리 제한 없음'도 눌러 설정합니다.\n"
-                        + "3. 알림을 허용해 주세요. 알림이 떠 있는 동안 Chrome을 붙잡아 둡니다.")
+                        + "3. 알림을 허용해 주세요. 알림이 떠 있는 동안 Chrome을 붙잡아 둡니다.\n"
+                        + "4. '기본 브라우저를 크롬뷰로'를 눌러 두면 링크를 열 때도 자동으로 유지가 켜집니다.")
                 .setPositiveButton("설정하기", (d, w) -> askBatteryExemption())
                 .setNegativeButton("나중에", null)
                 .setOnDismissListener(d -> {
@@ -138,6 +146,27 @@ public class MainActivity extends Activity {
                     }
                 })
                 .show();
+    }
+
+    private boolean isDefaultBrowser() {
+        return Build.VERSION.SDK_INT >= 29
+                && getSystemService(RoleManager.class).isRoleHeld(RoleManager.ROLE_BROWSER);
+    }
+
+    private void askDefaultBrowser() {
+        try {
+            if (Build.VERSION.SDK_INT >= 29 && !isDefaultBrowser()) {
+                RoleManager rm = getSystemService(RoleManager.class);
+                if (rm.isRoleAvailable(RoleManager.ROLE_BROWSER)) {
+                    startActivityForResult(rm.createRequestRoleIntent(RoleManager.ROLE_BROWSER), 2);
+                    return;
+                }
+            }
+            // 이미 지정돼 있거나 요청 창을 쓸 수 없으면 기본 앱 설정 화면을 연다.
+            startActivity(new Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS));
+        } catch (ActivityNotFoundException e) {
+            toast("설정 > 애플리케이션 > 기본 앱 선택 > 브라우저 앱에서 크롬뷰를 선택해 주세요");
+        }
     }
 
     private void askBatteryExemption() {

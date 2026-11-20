@@ -64,6 +64,36 @@
             android:text="유지 설정" />
 
         <LinearLayout
+            android:id="@+id/rowDefault"
+            style="@style/Row">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="기본 브라우저를 크롬뷰로"
+                    android:textColor="@color/text"
+                    android:textSize="16sp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="링크를 누르면 유지를 켠 뒤 Chrome으로 엽니다"
+                    android:textColor="@color/sub"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/defaultState"
+                style="@style/RowState" />
+        </LinearLayout>
+
+        <LinearLayout
             android:id="@+id/rowSelf"
             style="@style/Row">
 
@@ -107,6 +137,17 @@
         </LinearLayout>
 
         <Switch
+            android:id="@+id/autoStart"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:minHeight="60dp"
+            android:paddingStart="20dp"
+            android:paddingEnd="16dp"
+            android:text="폰을 켜면 자동으로 유지 시작"
+            android:textColor="@color/text"
+            android:textSize="16sp" />
+
+        <Switch
             android:id="@+id/autoChrome"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -118,10 +159,25 @@
             android:textSize="16sp" />
 
         <TextView
+            style="@style/Section"
+            android:text="성공률을 더 높이려면" />
+
+        <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginStart="20dp"
-            android:layout_marginTop="16dp"
+            android:layout_marginTop="4dp"
+            android:layout_marginEnd="20dp"
+            android:lineSpacingExtra="4dp"
+            android:text="1. 최근 앱 화면에서 Chrome 아이콘을 누르고 '이 앱 잠금(열린 상태 유지)'을 선택하세요. '모두 닫기'와 자동 정리에서 Chrome이 빠집니다.\n2. 설정 → 배터리 → 백그라운드 앱 사용 제한에서 Chrome과 크롬뷰가 '절전 예외 앱'에 있는지, '절전 상태 앱'에 없는지 확인하세요.\n3. 인증하러 갈 때 Chrome에 탭을 너무 많이 열어 두지 마세요. 탭이 적을수록 살아남습니다.\n4. 최근 앱 화면에서 Chrome이나 크롬뷰를 밀어서 닫지 마세요."
+            android:textColor="@color/text"
+            android:textSize="14sp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="20dp"
+            android:layout_marginTop="24dp"
             android:layout_marginEnd="20dp"
             android:lineSpacingExtra="3dp"
             android:text="로그인·인증·메뉴는 모두 Chrome 그대로 사용합니다. 크롬뷰는 알림창에 떠 있으면서 Chrome이 정리되지 않게만 합니다.\n\n이 화면을 다시 보려면 알림창의 크롬뷰 알림을 누르거나, 크롬뷰 아이콘을 길게 눌러 '크롬뷰 설정'을 선택하세요."
