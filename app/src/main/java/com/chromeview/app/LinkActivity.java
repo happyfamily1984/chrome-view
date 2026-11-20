@@ -26,6 +26,7 @@ public class LinkActivity extends Activity {
             if (text != null) in.putExtra(Intent.EXTRA_TEXT, text);
             startActivity(in);
         } else if (data != null) {
+            Diag.log(this, "받은 링크를 Chrome으로 넘김: " + Diag.brief(data.toString()));
             Intent out = new Intent(Intent.ACTION_VIEW, data)
                     .setPackage(KeepAliveService.CHROME)
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);

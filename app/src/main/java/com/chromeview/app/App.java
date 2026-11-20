@@ -12,6 +12,7 @@ public class App extends Application {
     @Override
     public void onCreate() {
         super.onCreate();
+        Diag.log(this, "앱 프로세스 시작 (이전에 완전히 꺼졌었음)");
         NotificationChannel ch = new NotificationChannel(
                 CHANNEL, "백그라운드 실행 유지", NotificationManager.IMPORTANCE_LOW);
         ch.setDescription("다른 앱을 쓰는 동안에도 열린 페이지와 로그인 상태를 유지합니다");

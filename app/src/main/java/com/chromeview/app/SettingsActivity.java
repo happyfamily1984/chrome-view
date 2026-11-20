@@ -38,6 +38,7 @@ public class SettingsActivity extends Activity {
         boot.setChecked(prefs.getBoolean("autoStart", true));
         boot.setOnCheckedChangeListener((b, on) -> prefs.edit().putBoolean("autoStart", on).apply());
         findViewById(R.id.rowChrome).setOnClickListener(v -> openChromeBatterySettings());
+        findViewById(R.id.rowDiag).setOnClickListener(v -> showDiag());
         Switch pinned = findViewById(R.id.usePinned);
         pinned.setChecked(prefs.getBoolean("usePinned", true));
         pinned.setOnCheckedChangeListener((b, on) -> prefs.edit().putBoolean("usePinned", on).apply());
@@ -78,6 +79,20 @@ public class SettingsActivity extends Activity {
         } else {
             status.setText("유지 켜짐 · 크롬뷰 고정 창의 페이지는 다른 앱을 다녀와도 그대로 남습니다.");
         }
+    }
+
+    private void showDiag() {
+        String text = Diag.read(this);
+        new AlertDialog.Builder(this)
+                .setTitle("진단 기록")
+                .setMessage(text)
+                .setPositiveButton("복사", (d, w) -> {
+                    getSystemService(android.content.ClipboardManager.class).setPrimaryClip(
+                            android.content.ClipData.newPlainText("크롬뷰 진단 기록", text));
+                    toast("복사했습니다");
+                })
+                .setNegativeButton("닫기", null)
+                .show();
     }
 
     private boolean launchChrome() {

@@ -168,6 +168,37 @@
             android:textColor="@color/sub"
             android:textSize="12sp" />
 
+        <LinearLayout
+            android:id="@+id/rowDiag"
+            style="@style/Row"
+            android:layout_marginTop="8dp">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="진단 기록"
+                    android:textColor="@color/text"
+                    android:textSize="16sp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="인증이 풀렸을 때 무슨 일이 있었는지 확인"
+                    android:textColor="@color/sub"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <TextView
+                style="@style/RowState"
+                android:text="보기" />
+        </LinearLayout>
+
         <TextView
             style="@style/Section"
             android:text="알아 두기" />

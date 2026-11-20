@@ -74,6 +74,9 @@ public class MainActivity extends Activity {
     private View customView;
     private WebChromeClient.CustomViewCallback customCallback;
     private boolean exiting;
+    /** 방금 외부 앱(인증 앱 등)을 부른 탭. 그 앱이 링크로 되돌아올 때 이 탭과 이어 준다. */
+    private static long waitingTabId = -1;
+    private static long waitingSince;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -111,6 +114,9 @@ public class MainActivity extends Activity {
         favorites = new Favorites(this);
 
         // 화면만 새로 만들어진 경우: 살아 있던 페이지들을 그대로 다시 붙인다.
+        int alive = 0;
+        for (Tab t : tm.tabs) if (t.web != null) alive++;
+        Diag.log(this, "화면 생성 · 탭 " + tm.tabs.size() + "개 중 살아 있는 페이지 " + alive + "개");
         for (Tab t : tm.tabs) {
             if (t.web != null) {
                 t.ctx.setBaseContext(this);
@@ -150,6 +156,14 @@ public class MainActivity extends Activity {
         super.onStart();
         KeepAliveService.start(this);
         if (tm != null && tm.atHome) rebuildHome();
+    }
+
+    @Override
+    protected void onRestart() {
+        super.onRestart();
+        Tab t = tm == null || tm.atHome ? null : tm.current();
+        Diag.log(this, "크롬뷰로 돌아옴 · " + (t == null ? "홈"
+                : (t.web != null ? "페이지 유지됨 " : "페이지 없음 ") + Diag.brief(t.url)));
     }
 
     @Override
@@ -246,7 +260,18 @@ public class MainActivity extends Activity {
         }
         if (url == null || !(url.startsWith("http://") || url.startsWith("https://"))) return false;
         leaveUrlBox();
-        show(tm.create(url, -1));
+        // 인증 앱이 '원래 페이지로 돌아가기'로 같은 주소를 다시 보내는 경우가 있다. 새로 열면
+        // 인증 전 상태의 새 페이지가 떠 버리므로, 이미 그 주소를 연 탭이 있으면 그 탭을 그대로 보여 준다.
+        Tab same = findByUrl(url);
+        if (same != null) {
+            Diag.log(this, "외부에서 링크 받음 → 이미 열린 탭으로 복귀: " + Diag.brief(url));
+            show(same);
+            return true;
+        }
+        Tab waiting = System.currentTimeMillis() - waitingSince < 15 * 60_000 ? tm.byId(waitingTabId) : null;
+        Diag.log(this, "외부에서 링크 받음 → 새 탭" + (waiting != null ? "(인증 대기 탭과 연결)" : "")
+                + ": " + Diag.brief(url));
+        show(tm.create(url, waiting != null ? waiting.id : -1));
         return true;
     }
 
@@ -254,6 +279,22 @@ public class MainActivity extends Activity {
         if (text.matches("(?i)^(https?|about|file):.*")) return text;
         if (!text.contains(" ") && text.matches("^[^/]+\\.[^/.]{2,}(/.*)?$")) return "https://" + text;
         return "https://www.google.com/search?q=" + Uri.encode(text);
+    }
+
+    private Tab findByUrl(String url) {
+        String want = stripFragment(url);
+        Tab cur = tm.current();
+        if (cur != null && stripFragment(cur.url).equals(want)) return cur;
+        for (int i = tm.tabs.size() - 1; i >= 0; i--) {
+            if (stripFragment(tm.tabs.get(i).url).equals(want)) return tm.tabs.get(i);
+        }
+        return null;
+    }
+
+    private static String stripFragment(String url) {
+        int i = url.indexOf('#');
+        url = i < 0 ? url : url.substring(0, i);
+        return url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
     }
 
     private void closeTab(Tab t) {
@@ -512,6 +553,7 @@ public class MainActivity extends Activity {
 
         Bundle saved = t.saved;
         t.saved = null;
+        if (saved != null) Diag.log(this, "저장해 둔 탭을 다시 불러옴: " + Diag.brief(t.url));
         if (saved != null && w.restoreState(saved) != null) return;
         if (!t.url.isEmpty()) w.loadUrl(t.url);
     }
@@ -580,6 +622,8 @@ public class MainActivity extends Activity {
         @Override
         public boolean onRenderProcessGone(WebView view, RenderProcessGoneDetail detail) {
             // 메모리 부족으로 페이지 프로세스가 죽은 경우: 앱은 살리고 그 탭만 다시 연다.
+            Diag.log(MainActivity.this, "페이지 프로세스가 " + (detail.didCrash() ? "오류로 죽음" : "시스템에 의해 정리됨")
+                    + ": " + Diag.brief(tab.url));
             webContainer.removeView(view);
             view.destroy();
             if (tab.web == view) {
@@ -730,8 +774,15 @@ public class MainActivity extends Activity {
         }
         try {
             startActivity(intent);
+            waitingTabId = tab.id;
+            waitingSince = System.currentTimeMillis();
+            Diag.log(this, "외부 앱 호출: " + intent.getScheme()
+                    + (intent.getPackage() != null ? " (" + intent.getPackage() + ")" : "")
+                    + " · 부른 페이지 " + Diag.brief(tab.url));
             return;
         } catch (ActivityNotFoundException | SecurityException ignored) {
+            Diag.log(this, "외부 앱 호출 실패: " + intent.getScheme()
+                    + (intent.getPackage() != null ? " (" + intent.getPackage() + ")" : ""));
         }
         String fallback = intent.getStringExtra("browser_fallback_url");
         if (fallback != null && fallback.matches("(?i)^https?://.*")) {
