@@ -14,6 +14,7 @@
 
         <!-- Chrome 과 같은 배치: 홈 · 주소창 · 탭 개수 · 메뉴 -->
         <LinearLayout
+            android:id="@+id/toolbar"
             android:layout_width="match_parent"
             android:layout_height="56dp"
             android:background="@color/bg_top"
@@ -29,8 +30,12 @@
                 android:contentDescription="홈"
                 android:src="@drawable/ic_home" />
 
-            <EditText
+            <AutoCompleteTextView
                 android:id="@+id/url"
+                android:completionThreshold="1"
+                android:dropDownAnchor="@id/toolbar"
+                android:dropDownWidth="match_parent"
+                android:popupBackground="@color/card"
                 android:layout_width="0dp"
                 android:layout_height="44dp"
                 android:layout_weight="1"

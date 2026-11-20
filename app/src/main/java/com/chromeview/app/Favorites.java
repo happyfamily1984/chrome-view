@@ -51,6 +51,18 @@ class Favorites {
         persist();
     }
 
+    /** 여러 개를 한 번에 추가한다. 이미 있는 주소는 건너뛰고, 새로 들어간 개수를 돌려준다. */
+    int addAll(List<Item> more) {
+        int added = 0;
+        for (Item i : more) {
+            if (contains(i.url)) continue;
+            items.add(i);
+            added++;
+        }
+        if (added > 0) persist();
+        return added;
+    }
+
     void remove(Item item) {
         items.remove(item);
         persist();

@@ -40,6 +40,8 @@ public class SettingsActivity extends Activity {
         boot.setOnCheckedChangeListener((b, on) -> prefs.edit().putBoolean("autoStart", on).apply());
         findViewById(R.id.rowChrome).setOnClickListener(v -> openChromeBatterySettings());
         findViewById(R.id.rowDiag).setOnClickListener(v -> showDiag());
+        findViewById(R.id.rowAutofill).setOnClickListener(v -> setUpAutofill());
+        findViewById(R.id.rowBookmarks).setOnClickListener(v -> pickBookmarkFile());
         Switch pinned = findViewById(R.id.usePinned);
         pinned.setChecked(prefs.getBoolean("usePinned", true));
         pinned.setOnCheckedChangeListener((b, on) -> prefs.edit().putBoolean("usePinned", on).apply());
@@ -79,6 +81,82 @@ public class SettingsActivity extends Activity {
                     + "아래 '크롬뷰 배터리 제한 없음'을 눌러 주세요.");
         } else {
             status.setText("유지 켜짐 · 크롬뷰 고정 창의 페이지는 다른 앱을 다녀와도 그대로 남습니다.");
+        }
+    }
+
+    /**
+     * 다른 앱은 Chrome 안의 비밀번호를 직접 읽을 수 없다. 대신 폰의 '자동 완성 서비스'를 Google 로 두면
+     * Chrome 이 쓰는 것과 같은 Google 비밀번호 관리자가 크롬뷰의 로그인 칸에도 아이디·비밀번호를 제안한다.
+     */
+    private void setUpAutofill() {
+        new AlertDialog.Builder(this)
+                .setTitle("저장된 아이디·비밀번호 쓰기")
+                .setMessage("다음 화면에서 'Google'을 선택해 주세요.\n\n"
+                        + "그러면 크롬뷰에서 로그인 칸을 누를 때, Chrome에 저장해 둔 아이디와 비밀번호가 "
+                        + "제안으로 나타납니다. Google 계정에 저장한 주소·연락처 자동 완성도 함께 쓸 수 있고, "
+                        + "새로 로그인한 정보도 같은 곳에 저장됩니다.\n\n"
+                        + "(삼성 패스를 쓰고 계셨다면 그대로 두셔도 됩니다. 그 경우 삼성 패스에 저장된 정보가 제안됩니다.)")
+                .setPositiveButton("설정 열기", (d, w) -> {
+                    try {
+                        startActivity(new Intent(Settings.ACTION_REQUEST_SET_AUTOFILL_SERVICE,
+                                Uri.parse("package:" + getPackageName())));
+                    } catch (RuntimeException e) {
+                        toast("설정 > 일반 > 비밀번호 및 자동 완성에서 'Google'을 선택해 주세요");
+                    }
+                })
+                .setNegativeButton("취소", null)
+                .show();
+    }
+
+    private void pickBookmarkFile() {
+        new AlertDialog.Builder(this)
+                .setTitle("북마크 파일 가져오기")
+                .setMessage("휴대폰 Chrome에는 북마크를 내보내는 기능이 없어서, 파일을 한 번 만들어 와야 합니다.\n\n"
+                        + "• PC Chrome: 메뉴 → 북마크 및 목록 → 북마크 관리자 → ⋮ → 북마크 내보내기\n"
+                        + "• 또는 takeout.google.com 에서 Chrome 북마크만 선택해 내려받기\n\n"
+                        + "만든 .html 파일을 폰으로 옮긴 뒤 선택해 주세요.")
+                .setPositiveButton("파일 선택", (d, w) -> {
+                    try {
+                        startActivityForResult(new Intent(Intent.ACTION_OPEN_DOCUMENT)
+                                .addCategory(Intent.CATEGORY_OPENABLE).setType("*/*")
+                                .putExtra(Intent.EXTRA_MIME_TYPES,
+                                        new String[]{"text/html", "application/xhtml+xml", "text/plain"}), 3);
+                    } catch (ActivityNotFoundException e) {
+                        toast("파일을 선택할 앱이 없습니다");
+                    }
+                })
+                .setNegativeButton("취소", null)
+                .show();
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode != 3 || resultCode != RESULT_OK || data == null || data.getData() == null) return;
+        try (java.io.InputStream in = getContentResolver().openInputStream(data.getData())) {
+            java.io.ByteArrayOutputStream buf = new java.io.ByteArrayOutputStream();
+            byte[] chunk = new byte[16384];
+            int n;
+            while ((n = in.read(chunk)) > 0 && buf.size() < 8_000_000) buf.write(chunk, 0, n);
+            String html = buf.toString("UTF-8");
+            java.util.List<Favorites.Item> found = new java.util.ArrayList<>();
+            java.util.regex.Matcher m = java.util.regex.Pattern.compile(
+                    "<a\\s[^>]*?href=\"(https?://[^\"]+)\"[^>]*>(.*?)</a>",
+                    java.util.regex.Pattern.CASE_INSENSITIVE | java.util.regex.Pattern.DOTALL).matcher(html);
+            while (m.find()) {
+                String url = android.text.Html.fromHtml(m.group(1), 0).toString();
+                String title = android.text.Html.fromHtml(m.group(2), 0).toString().trim();
+                found.add(new Favorites.Item(title.isEmpty() ? url : title, url));
+            }
+            if (found.isEmpty()) {
+                toast("이 파일에서 북마크를 찾지 못했습니다");
+                return;
+            }
+            int added = new Favorites(this).addAll(found);
+            Toast.makeText(this, "북마크 " + found.size() + "개 중 " + added + "개를 즐겨찾기에 추가했습니다"
+                    + (added < found.size() ? " (나머지는 이미 있음)" : ""), Toast.LENGTH_LONG).show();
+        } catch (Exception e) {
+            toast("파일을 읽지 못했습니다");
         }
     }
 

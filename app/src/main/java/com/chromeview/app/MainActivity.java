@@ -34,7 +34,10 @@ import android.webkit.WebSettings;
 import android.webkit.WebStorage;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
-import android.widget.EditText;
+import android.widget.AutoCompleteTextView;
+import android.widget.BaseAdapter;
+import android.widget.Filter;
+import android.widget.Filterable;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.PopupMenu;
@@ -64,7 +67,8 @@ public class MainActivity extends Activity {
     private Favorites favorites;
     private FrameLayout webContainer, fullscreen;
     private View home, root;
-    private EditText urlBox;
+    private AutoCompleteTextView urlBox;
+    private History history;
     private ProgressBar progress;
     private LinearLayout tabList, favList;
     private TextView tabsHeader, status, tabCount;
@@ -112,6 +116,14 @@ public class MainActivity extends Activity {
 
         tm = App.tabs(this);
         favorites = new Favorites(this);
+        history = new History(this);
+        SuggestAdapter suggest = new SuggestAdapter();
+        urlBox.setAdapter(suggest);
+        urlBox.setOnItemClickListener((parent, view, pos, id) -> {
+            String url = (String) suggest.getItem(pos);
+            leaveUrlBox();
+            navigate(url);
+        });
 
         // 화면만 새로 만들어진 경우: 살아 있던 페이지들을 그대로 다시 붙인다.
         int alive = 0;
@@ -155,7 +167,10 @@ public class MainActivity extends Activity {
     protected void onStart() {
         super.onStart();
         KeepAliveService.start(this);
-        if (tm != null && tm.atHome) rebuildHome();
+        if (tm != null) {
+            favorites = new Favorites(this); // 설정에서 북마크를 가져왔을 수 있다
+            if (tm.atHome) rebuildHome();
+        }
     }
 
     @Override
@@ -200,7 +215,7 @@ public class MainActivity extends Activity {
             home.setVisibility(View.VISIBLE);
             webContainer.setVisibility(View.GONE);
             progress.setVisibility(View.GONE);
-            urlBox.setText("");
+            urlBox.setText("", false);
             rebuildHome();
             return;
         }
@@ -211,7 +226,7 @@ public class MainActivity extends Activity {
         }
         home.setVisibility(View.GONE);
         webContainer.setVisibility(View.VISIBLE);
-        urlBox.setText(t.url);
+        urlBox.setText(t.url, false);
         int p = t.web.getProgress();
         progress.setProgress(p);
         progress.setVisibility(p < 100 ? View.VISIBLE : View.GONE);
@@ -346,6 +361,76 @@ public class MainActivity extends Activity {
         return false;
     }
 
+    /** 주소창 자동완성: 즐겨찾기와 크롬뷰 방문 기록에서 제목·주소가 맞는 것을 보여 준다. */
+    private class SuggestAdapter extends BaseAdapter implements Filterable {
+        private List<String[]> shown = new ArrayList<>();
+
+        @Override
+        public int getCount() {
+            return shown.size();
+        }
+
+        @Override
+        public Object getItem(int i) {
+            return shown.get(i)[1];
+        }
+
+        @Override
+        public long getItemId(int i) {
+            return i;
+        }
+
+        @Override
+        public View getView(int i, View v, ViewGroup parent) {
+            if (v == null) v = getLayoutInflater().inflate(R.layout.item_suggest, parent, false);
+            String[] it = shown.get(i);
+            ((TextView) v.findViewById(R.id.title)).setText(it[0].isEmpty() ? it[1] : it[0]);
+            ((TextView) v.findViewById(R.id.sub)).setText(it[1]);
+            return v;
+        }
+
+        @Override
+        public Filter getFilter() {
+            return new Filter() {
+                @Override
+                protected FilterResults performFiltering(CharSequence constraint) {
+                    List<String[]> out = new ArrayList<>();
+                    String q = constraint == null ? "" : constraint.toString().trim().toLowerCase();
+                    if (!q.isEmpty()) {
+                        List<String[]> all = new ArrayList<>();
+                        try {
+                            for (Favorites.Item f : new ArrayList<>(favorites.items)) {
+                                all.add(new String[]{f.title, f.url});
+                            }
+                        } catch (RuntimeException ignored) {
+                        }
+                        all.addAll(history.snapshot());
+                        java.util.Set<String> seen = new java.util.HashSet<>();
+                        for (String[] it : all) {
+                            if (out.size() >= 8) break;
+                            String bare = it[1].replaceFirst("(?i)^https?://(www\\.|m\\.)?", "").toLowerCase();
+                            if ((bare.contains(q) || it[0].toLowerCase().contains(q)) && seen.add(it[1])) {
+                                out.add(it);
+                            }
+                        }
+                    }
+                    FilterResults r = new FilterResults();
+                    r.values = out;
+                    r.count = out.size();
+                    return r;
+                }
+
+                @Override
+                @SuppressWarnings("unchecked")
+                protected void publishResults(CharSequence constraint, FilterResults results) {
+                    shown = results.values == null ? new ArrayList<>() : (List<String[]>) results.values;
+                    if (shown.isEmpty()) notifyDataSetInvalidated();
+                    else notifyDataSetChanged();
+                }
+            };
+        }
+    }
+
     // ───────────────────────── 홈 화면 ─────────────────────────
 
     private void rebuildHome() {
@@ -436,7 +521,7 @@ public class MainActivity extends Activity {
         if (urlBox.hasFocus()) {
             leaveUrlBox();
             Tab t = tm.atHome ? null : tm.current();
-            urlBox.setText(t == null ? "" : t.url);
+            urlBox.setText(t == null ? "" : t.url, false);
             return;
         }
         if (tm.atHome) {
@@ -497,6 +582,7 @@ public class MainActivity extends Activity {
             m.add(0, 7, 0, "이 탭 닫기");
         }
         m.add(0, 8, 0, "설정");
+        m.add(0, 10, 0, "방문 기록 삭제");
         m.add(0, 9, 0, "로그인 정보 모두 삭제");
         pm.setOnMenuItemClickListener(item -> {
             switch (item.getItemId()) {
@@ -536,6 +622,10 @@ public class MainActivity extends Activity {
                     break;
                 case 9:
                     confirmClearLogins();
+                    break;
+                case 10:
+                    history.clear();
+                    toast("방문 기록을 삭제했습니다");
                     break;
             }
             return true;
@@ -615,7 +705,7 @@ public class MainActivity extends Activity {
 
     private void onTabChanged(Tab t) {
         if (isShowing(t)) {
-            if (!urlBox.hasFocus()) urlBox.setText(t.url);
+            if (!urlBox.hasFocus()) urlBox.setText(t.url, false);
         } else if (tm.atHome) {
             rebuildHome();
         }
@@ -653,6 +743,7 @@ public class MainActivity extends Activity {
             tab.url = url;
             if (view.getTitle() != null) tab.title = view.getTitle();
             CookieManager.getInstance().flush(); // 로그인 직후 쿠키를 바로 디스크에 남긴다
+            history.add(tab.title, url);
             onTabChanged(tab);
         }
 

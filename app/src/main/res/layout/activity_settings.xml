@@ -311,6 +311,87 @@
             android:textSize="13sp" />
 
         <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:layout_marginBottom="12dp"
+            android:gravity="center_vertical"
+            android:paddingStart="20dp">
+
+            <View
+                android:layout_width="5dp"
+                android:layout_height="20dp"
+                android:layout_marginEnd="10dp"
+                android:background="@drawable/bg_accent_bar" />
+
+            <TextView
+                style="@style/Section"
+                android:text="Chrome 정보 가져오기" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/rowAutofill"
+            style="@style/Row">
+
+            <ImageView
+                style="@style/RowIcon"
+                android:importantForAccessibility="no"
+                android:src="@drawable/ic_shield" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:paddingTop="12dp"
+                android:paddingBottom="12dp">
+
+                <TextView
+                    style="@style/RowTitle"
+                    android:text="저장된 로그인·자동 완성 쓰기" />
+
+                <TextView
+                    style="@style/RowSub"
+                    android:text="Chrome에 저장한 아이디·비밀번호·주소 자동 입력" />
+            </LinearLayout>
+
+            <TextView
+                style="@style/RowState"
+                android:text="설정" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/rowBookmarks"
+            style="@style/Row">
+
+            <ImageView
+                style="@style/RowIcon"
+                android:importantForAccessibility="no"
+                android:src="@drawable/ic_bookmark" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:paddingTop="12dp"
+                android:paddingBottom="12dp">
+
+                <TextView
+                    style="@style/RowTitle"
+                    android:text="북마크 파일 가져오기" />
+
+                <TextView
+                    style="@style/RowSub"
+                    android:text="Chrome 북마크(.html)를 즐겨찾기에 추가" />
+            </LinearLayout>
+
+            <TextView
+                style="@style/RowState"
+                android:text="선택" />
+        </LinearLayout>
+
+        <LinearLayout
             android:id="@+id/rowDiag"
             style="@style/Row">
 
