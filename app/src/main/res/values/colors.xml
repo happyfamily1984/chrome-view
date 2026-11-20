@@ -1,4 +1,6 @@
 <resources>
+    <color name="bar">#EEF2F1</color>
+    <color name="field">#FFFFFF</color>
     <color name="bg">#FFFFFF</color>
     <color name="text">#1B1F1E</color>
     <color name="sub">#5E6866</color>

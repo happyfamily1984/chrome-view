@@ -131,18 +131,13 @@ public class KeepAliveService extends Service {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         PendingIntent open = PendingIntent.getActivity(this, 0,
-                new Intent(this, MainActivity.class).setAction(MainActivity.ACTION_SETTINGS),
+                new Intent(this, MainActivity.class).setAction(MainActivity.ACTION_OPEN),
                 PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
         Notification.Builder b = new Notification.Builder(this, App.CHANNEL);
-        Intent launch = getPackageManager().getLaunchIntentForPackage(CHROME);
-        if (launch != null) {
-            b.addAction(new Notification.Action.Builder(null, "Chrome 열기",
-                    PendingIntent.getActivity(this, 1, launch, PendingIntent.FLAG_IMMUTABLE)).build());
-        }
         Notification n = b
                 .setSmallIcon(R.drawable.ic_stat)
-                .setContentTitle("크롬뷰가 Chrome을 유지하는 중")
-                .setContentText("탭과 로그인·인증 상태가 닫히지 않게 붙잡고 있습니다")
+                .setContentTitle("크롬뷰 실행 유지 중")
+                .setContentText("열린 페이지와 로그인·인증 상태를 붙잡고 있습니다")
                 .setContentIntent(open)
                 .setOngoing(true)
                 .setShowWhen(false)
@@ -158,6 +153,12 @@ public class KeepAliveService extends Service {
             return START_NOT_STICKY;
         }
         return START_STICKY;
+    }
+
+    @Override
+    public void onTaskRemoved(Intent rootIntent) {
+        // 최근 앱 목록에서 밀어내도 탭 기록은 남긴다.
+        App.tabs(this).save();
     }
 
     @Override
