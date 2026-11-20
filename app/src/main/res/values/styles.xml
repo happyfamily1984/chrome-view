@@ -1,40 +1,56 @@
 <resources>
     <style name="AppTheme" parent="android:Theme.DeviceDefault.Light.NoActionBar">
-        <item name="android:windowBackground">@color/bg</item>
-        <item name="android:statusBarColor">@color/bar</item>
-        <item name="android:navigationBarColor">@color/bg</item>
+        <item name="android:windowBackground">@drawable/bg_screen</item>
+        <item name="android:statusBarColor">@color/bg_top</item>
+        <item name="android:navigationBarColor">@color/bg_bottom</item>
         <item name="android:windowLightStatusBar">true</item>
         <item name="android:windowLightNavigationBar">true</item>
         <item name="android:colorAccent">@color/accent</item>
     </style>
 
     <style name="Section">
-        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_width">wrap_content</item>
         <item name="android:layout_height">wrap_content</item>
-        <item name="android:layout_marginStart">20dp</item>
-        <item name="android:layout_marginTop">28dp</item>
-        <item name="android:layout_marginBottom">4dp</item>
         <item name="android:textColor">@color/accent</item>
-        <item name="android:textSize">13sp</item>
+        <item name="android:textSize">17sp</item>
         <item name="android:textStyle">bold</item>
     </style>
 
+    <!-- 흰 카드 한 장으로 된 설정 항목 -->
     <style name="Row">
         <item name="android:layout_width">match_parent</item>
         <item name="android:layout_height">wrap_content</item>
-        <item name="android:minHeight">60dp</item>
+        <item name="android:layout_marginStart">16dp</item>
+        <item name="android:layout_marginEnd">16dp</item>
+        <item name="android:layout_marginBottom">10dp</item>
+        <item name="android:minHeight">68dp</item>
         <item name="android:gravity">center_vertical</item>
-        <item name="android:paddingStart">20dp</item>
-        <item name="android:paddingEnd">20dp</item>
-        <item name="android:background">?android:attr/selectableItemBackground</item>
+        <item name="android:paddingStart">16dp</item>
+        <item name="android:paddingEnd">12dp</item>
+        <item name="android:background">@drawable/bg_card_ripple</item>
+        <item name="android:elevation">2dp</item>
+    </style>
+
+    <style name="RowIcon">
+        <item name="android:layout_width">40dp</item>
+        <item name="android:layout_height">40dp</item>
+        <item name="android:layout_marginEnd">14dp</item>
+        <item name="android:padding">9dp</item>
+        <item name="android:background">@drawable/bg_chip</item>
     </style>
 
     <style name="RowTitle">
-        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_width">wrap_content</item>
         <item name="android:layout_height">wrap_content</item>
-        <item name="android:layout_weight">1</item>
         <item name="android:textColor">@color/text</item>
         <item name="android:textSize">16sp</item>
+    </style>
+
+    <style name="RowSub">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:textColor">@color/sub</item>
+        <item name="android:textSize">12sp</item>
     </style>
 
     <style name="RowState">
@@ -43,5 +59,7 @@
         <item name="android:textColor">@color/accent</item>
         <item name="android:textSize">14sp</item>
         <item name="android:textStyle">bold</item>
+        <item name="android:drawableEnd">@drawable/ic_chevron</item>
+        <item name="android:gravity">center_vertical</item>
     </style>
 </resources>

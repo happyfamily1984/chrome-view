@@ -1,10 +1,16 @@
 <resources>
-    <color name="bar">#1C2120</color>
-    <color name="field">#2A302F</color>
-    <color name="bg">#121514</color>
-    <color name="text">#E6EAE9</color>
-    <color name="sub">#9BA5A3</color>
-    <color name="accent">#5CC8C0</color>
+    <color name="bg_top">#10262B</color>
+    <color name="bg_mid">#0F1719</color>
+    <color name="bg_bottom">#0F1F21</color>
+    <color name="bar">#10262B</color>
+    <color name="field">#22343A</color>
+    <color name="bg">#0F1719</color>
+    <color name="card">#1A2729</color>
+    <color name="line">#2A393C</color>
+    <color name="text">#E6EFEF</color>
+    <color name="sub">#9CB1B4</color>
+    <color name="accent">#4FD1CC</color>
+    <color name="accent_light">#3BB8B4</color>
     <color name="on_accent">#06201E</color>
-    <color name="chip">#24403D</color>
+    <color name="chip">#1F3B3B</color>
 </resources>

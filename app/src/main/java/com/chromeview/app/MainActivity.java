@@ -365,6 +365,15 @@ public class MainActivity extends Activity {
     }
 
     private View row(LayoutInflater inf, ViewGroup parent, String title, String url) {
+        if (parent.getChildCount() > 0) {
+            float dp = getResources().getDisplayMetrics().density;
+            View line = new View(this);
+            line.setBackgroundColor(getColor(R.color.line));
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, Math.max(1, (int) dp));
+            lp.setMarginStart((int) (76 * dp));
+            parent.addView(line, lp);
+        }
         View row = inf.inflate(R.layout.item_row, parent, false);
         String host = Uri.parse(url).getHost();
         if (host == null) host = "";
@@ -383,7 +392,8 @@ public class MainActivity extends Activity {
         v.setText(text);
         v.setTextSize(14);
         v.setTextColor(getColor(R.color.sub));
-        int pad = (int) (20 * getResources().getDisplayMetrics().density);
+        v.setLineSpacing(0, 1.2f);
+        int pad = (int) (16 * getResources().getDisplayMetrics().density);
         v.setPadding(pad, pad / 2, pad, pad / 2);
         return v;
     }

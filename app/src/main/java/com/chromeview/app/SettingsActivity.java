@@ -31,6 +31,7 @@ public class SettingsActivity extends Activity {
         status = findViewById(R.id.status);
         selfState = findViewById(R.id.selfState);
         findViewById(R.id.btnChrome).setOnClickListener(v -> launchChrome());
+        findViewById(R.id.btnBack).setOnClickListener(v -> finish());
         defaultState = findViewById(R.id.defaultState);
         findViewById(R.id.rowDefault).setOnClickListener(v -> askDefaultBrowser());
         findViewById(R.id.rowSelf).setOnClickListener(v -> askBatteryExemption());
