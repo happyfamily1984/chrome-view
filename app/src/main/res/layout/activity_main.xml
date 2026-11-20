@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bg"
+    android:fillViewport="true"
+    android:fitsSystemWindows="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingTop="28dp"
+        android:paddingBottom="32dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="20dp"
+            android:text="크롬뷰"
+            android:textColor="@color/text"
+            android:textSize="28sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="20dp"
+            android:layout_marginTop="4dp"
+            android:layout_marginEnd="20dp"
+            android:text="Chrome이 백그라운드에서 닫히지 않게 붙잡아 둡니다"
+            android:textColor="@color/sub"
+            android:textSize="14sp" />
+
+        <TextView
+            android:id="@+id/status"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:layout_marginTop="20dp"
+            android:layout_marginEnd="16dp"
+            android:background="@drawable/bg_status"
+            android:lineSpacingExtra="3dp"
+            android:padding="16dp"
+            android:textColor="@color/text"
+            android:textSize="15sp" />
+
+        <TextView
+            android:id="@+id/btnChrome"
+            android:layout_width="match_parent"
+            android:layout_height="54dp"
+            android:layout_marginStart="16dp"
+            android:layout_marginTop="16dp"
+            android:layout_marginEnd="16dp"
+            android:background="@drawable/bg_btn"
+            android:gravity="center"
+            android:text="Chrome 열기"
+            android:textColor="@color/on_accent"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+
+        <TextView
+            style="@style/Section"
+            android:text="유지 설정" />
+
+        <LinearLayout
+            android:id="@+id/rowSelf"
+            style="@style/Row">
+
+            <TextView
+                style="@style/RowTitle"
+                android:text="크롬뷰 배터리 제한 없음" />
+
+            <TextView
+                android:id="@+id/selfState"
+                style="@style/RowState" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/rowChrome"
+            style="@style/Row">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Chrome 배터리 제한 없음"
+                    android:textColor="@color/text"
+                    android:textSize="16sp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="눌러서 배터리 → '제한 없음' 선택"
+                    android:textColor="@color/sub"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <TextView
+                style="@style/RowState"
+                android:text="설정 열기" />
+        </LinearLayout>
+
+        <Switch
+            android:id="@+id/autoChrome"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:minHeight="60dp"
+            android:paddingStart="20dp"
+            android:paddingEnd="16dp"
+            android:text="아이콘을 누르면 바로 Chrome 실행"
+            android:textColor="@color/text"
+            android:textSize="16sp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="20dp"
+            android:layout_marginTop="16dp"
+            android:layout_marginEnd="20dp"
+            android:lineSpacingExtra="3dp"
+            android:text="로그인·인증·메뉴는 모두 Chrome 그대로 사용합니다. 크롬뷰는 알림창에 떠 있으면서 Chrome이 정리되지 않게만 합니다.\n\n이 화면을 다시 보려면 알림창의 크롬뷰 알림을 누르거나, 크롬뷰 아이콘을 길게 눌러 '크롬뷰 설정'을 선택하세요."
+            android:textColor="@color/sub"
+            android:textSize="13sp" />
+    </LinearLayout>
+</ScrollView>

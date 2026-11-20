@@ -1,0 +1,45 @@
+plugins {
+    id "com.android.application"
+}
+
+android {
+    namespace "com.chromeview.app"
+    compileSdk 35
+
+    defaultConfig {
+        applicationId "com.chromeview.app"
+        minSdk 26
+        // 34를 유지: 35부터는 화면 전체(edge-to-edge) 강제와 포그라운드 서비스 시간 제한이 생긴다.
+        targetSdk 34
+        versionCode 1
+        versionName "1.0"
+    }
+
+    // 저장소에는 서명 키를 두지 않는다. app/chromeview.keystore 가 있으면 그 키로,
+    // 없으면 디버그 키로 서명한다(직접 설치용으로는 어느 쪽이든 설치된다).
+    def keyFile = file("chromeview.keystore")
+    signingConfigs {
+        if (keyFile.exists()) {
+            local {
+                storeFile keyFile
+                storePassword System.getenv("CHROMEVIEW_KEY_PASSWORD") ?: "chromeview"
+                keyAlias "chromeview"
+                keyPassword System.getenv("CHROMEVIEW_KEY_PASSWORD") ?: "chromeview"
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig keyFile.exists() ? signingConfigs.local : signingConfigs.debug
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    lint { checkReleaseBuilds false }
+}
