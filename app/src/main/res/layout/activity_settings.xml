@@ -175,6 +175,37 @@
         </LinearLayout>
 
         <LinearLayout
+            android:id="@+id/rowHomepage"
+            style="@style/Row">
+
+            <ImageView
+                style="@style/RowIcon"
+                android:importantForAccessibility="no"
+                android:src="@drawable/ic_home_row" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:paddingTop="12dp"
+                android:paddingBottom="12dp">
+
+                <TextView
+                    style="@style/RowTitle"
+                    android:text="시작 페이지" />
+
+                <TextView
+                    style="@style/RowSub"
+                    android:text="처음 열 때와 홈 버튼을 누를 때 여는 사이트" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/homepageState"
+                style="@style/RowState" />
+        </LinearLayout>
+
+        <LinearLayout
             android:id="@+id/rowSelf"
             style="@style/Row">
 

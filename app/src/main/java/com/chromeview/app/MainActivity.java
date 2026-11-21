@@ -33,6 +33,10 @@ import android.webkit.WebSettings;
 import android.webkit.WebStorage;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+
+import androidx.webkit.ProfileStore;
+import androidx.webkit.WebViewCompat;
+import androidx.webkit.WebViewFeature;
 import android.widget.AutoCompleteTextView;
 import android.widget.BaseAdapter;
 import android.widget.Filter;
@@ -57,6 +61,8 @@ import java.util.regex.Pattern;
 public class MainActivity extends Activity {
     static final String ACTION_OPEN = "com.chromeview.app.OPEN";
     static final String ACTION_SETTINGS = "com.chromeview.app.SETTINGS";
+    static final String DEFAULT_HOMEPAGE = "https://m.naver.com";
+    private static final String INCOGNITO_PROFILE = "incognito";
 
     private static final int REQ_FILE = 1;
     private static final int REQ_MEDIA_PERM = 2;
@@ -114,6 +120,11 @@ public class MainActivity extends Activity {
         tabCount = findViewById(R.id.tabCount);
 
         tm = App.tabs(this);
+        // 탭 목록(메뉴) 화면은 버튼을 눌렀을 때만 보인다. 시작할 때는 항상 페이지를 보여 준다.
+        tm.atHome = false;
+        boolean anyIncognito = false;
+        for (Tab t : tm.tabs) anyIncognito |= t.incognito;
+        if (!anyIncognito) deleteIncognitoData(); // 지난번에 앱이 갑자기 꺼졌으면 남아 있을 수 있다
         favorites = new Favorites(this);
         history = new History(this);
         SuggestAdapter suggest = new SuggestAdapter();
@@ -136,8 +147,8 @@ public class MainActivity extends Activity {
             }
         }
 
-        findViewById(R.id.btnHome).setOnClickListener(v -> goHome());
-        findViewById(R.id.btnTabs).setOnClickListener(v -> goHome());
+        findViewById(R.id.btnHome).setOnClickListener(v -> goHomepage());
+        findViewById(R.id.btnTabs).setOnClickListener(v -> openTabList());
         findViewById(R.id.btnMenu).setOnClickListener(this::showMenu);
         findViewById(R.id.btnSettings).setOnClickListener(v -> openSettings());
         findViewById(R.id.btnChrome).setOnClickListener(v -> confirmOpenChrome());
@@ -207,10 +218,19 @@ public class MainActivity extends Activity {
     // ───────────────────────── 화면 전환 ─────────────────────────
 
     private void render() {
-        Tab t = tm.atHome ? null : tm.current();
         tabCount.setText(String.valueOf(tm.tabs.size()));
+        Tab t = null;
+        if (!tm.atHome) {
+            t = tm.current();
+            if (t == null) {
+                // 보던 화면이 없으면 메뉴가 아니라 마지막 탭, 그것도 없으면 시작 페이지를 연다.
+                t = tm.tabs.isEmpty() ? tm.create(homepage(this), -1) : tm.tabs.get(tm.tabs.size() - 1);
+                tm.select(t);
+                tabCount.setText(String.valueOf(tm.tabs.size()));
+            }
+        }
+        applyIncognitoLook(t != null && t.incognito);
         if (t == null) {
-            tm.atHome = true;
             home.setVisibility(View.VISIBLE);
             webContainer.setVisibility(View.GONE);
             progress.setVisibility(View.GONE);
@@ -231,10 +251,119 @@ public class MainActivity extends Activity {
         progress.setVisibility(p < 100 ? View.VISIBLE : View.GONE);
     }
 
-    private void goHome() {
+    /** 탭 목록·즐겨찾기(메뉴) 화면. 탭 개수 버튼이나 메뉴에서 눌렀을 때만 연다. */
+    private void openTabList() {
         leaveUrlBox();
         tm.atHome = true;
         render();
+    }
+
+    /** 홈 버튼: Chrome 처럼 지금 탭에서 시작 페이지를 연다. */
+    private void goHomepage() {
+        leaveUrlBox();
+        tm.atHome = false;
+        Tab t = tm.current();
+        if (t == null) {
+            show(tm.create(homepage(this), -1));
+            return;
+        }
+        show(t);
+        t.url = homepage(this);
+        t.web.loadUrl(t.url);
+    }
+
+    static String homepage(Context c) {
+        return c.getSharedPreferences("app", MODE_PRIVATE).getString("homepage", DEFAULT_HOMEPAGE);
+    }
+
+    private void openNewTab(boolean incognito) {
+        Tab t = tm.create(homepage(this), -1);
+        t.incognito = incognito;
+        if (incognito && !incognitoSupported() && !getSharedPreferences("app", MODE_PRIVATE)
+                .getBoolean("incognitoWarned", false)) {
+            getSharedPreferences("app", MODE_PRIVATE).edit().putBoolean("incognitoWarned", true).apply();
+            new AlertDialog.Builder(this)
+                    .setTitle("시크릿 탭")
+                    .setMessage("이 폰의 'Android 시스템 WebView'가 오래되어 시크릿 탭의 로그인 정보를 일반 탭과 "
+                            + "분리하지 못합니다. 방문 기록과 탭은 남지 않지만, 로그인은 일반 탭과 함께 쓰입니다.\n\n"
+                            + "Play 스토어에서 'Android 시스템 WebView'를 업데이트하면 완전히 분리됩니다.")
+                    .setPositiveButton("확인", null)
+                    .show();
+        }
+        show(t);
+        urlBox.requestFocus();
+        getSystemService(InputMethodManager.class).showSoftInput(urlBox, 0);
+    }
+
+    // ───────────────────────── 시크릿 모드 ─────────────────────────
+
+    private static boolean incognitoSupported() {
+        try {
+            return WebViewFeature.isFeatureSupported(WebViewFeature.MULTI_PROFILE);
+        } catch (RuntimeException e) {
+            return false;
+        }
+    }
+
+    private static CookieManager cookiesFor(Tab t) {
+        if (t != null && t.incognito && incognitoSupported()) {
+            try {
+                return ProfileStore.getInstance().getOrCreateProfile(INCOGNITO_PROFILE).getCookieManager();
+            } catch (RuntimeException ignored) {
+            }
+        }
+        return CookieManager.getInstance();
+    }
+
+    /** 시크릿 탭에서 생긴 쿠키·사이트 데이터를 통째로 지운다. 시크릿 탭이 하나도 없을 때만 지워진다. */
+    private void deleteIncognitoData() {
+        if (!incognitoSupported()) return;
+        try {
+            ProfileStore store = ProfileStore.getInstance();
+            if (store.getAllProfileNames().contains(INCOGNITO_PROFILE)) store.deleteProfile(INCOGNITO_PROFILE);
+        } catch (RuntimeException e) {
+            // 페이지가 아직 완전히 내려가지 않았으면 잠시 뒤 한 번 더 시도한다.
+            root.postDelayed(() -> {
+                try {
+                    ProfileStore.getInstance().deleteProfile(INCOGNITO_PROFILE);
+                } catch (RuntimeException ignored) {
+                }
+            }, 1500);
+        }
+    }
+
+    private boolean hasIncognitoTabs() {
+        for (Tab t : tm.tabs) if (t.incognito) return true;
+        return false;
+    }
+
+    private void closeAllIncognito() {
+        for (Tab t : new ArrayList<>(tm.tabs)) if (t.incognito) closeTab(t);
+    }
+
+    /** 시크릿 탭을 보고 있을 때는 Chrome 처럼 위쪽 막대를 어둡게 바꾼다. */
+    private void applyIncognitoLook(boolean on) {
+        int bar = on ? 0xFF3C4043 : getColor(R.color.bg_top);
+        int fg = on ? 0xFFFFFFFF : getColor(R.color.text);
+        findViewById(R.id.toolbar).setBackgroundColor(bar);
+        urlBox.setBackgroundResource(on ? R.drawable.bg_field_incognito : R.drawable.bg_field);
+        urlBox.setTextColor(fg);
+        urlBox.setHintTextColor(on ? 0xFFBDC1C6 : getColor(R.color.sub));
+        urlBox.setHint(on ? "시크릿 모드 · 검색어 또는 주소 입력" : "검색어 또는 주소 입력");
+        android.content.res.ColorStateList tint = android.content.res.ColorStateList.valueOf(fg);
+        ((android.widget.ImageButton) findViewById(R.id.btnHome)).setImageTintList(tint);
+        ((android.widget.ImageButton) findViewById(R.id.btnMenu)).setImageTintList(tint);
+        tabCount.setTextColor(fg);
+        tabCount.setBackgroundTintList(tint);
+        getWindow().setStatusBarColor(bar);
+        boolean nightUi = (getResources().getConfiguration().uiMode
+                & android.content.res.Configuration.UI_MODE_NIGHT_MASK)
+                == android.content.res.Configuration.UI_MODE_NIGHT_YES;
+        View decor = getWindow().getDecorView();
+        int flags = decor.getSystemUiVisibility();
+        if (on || nightUi) flags &= ~View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
+        else flags |= View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
+        decor.setSystemUiVisibility(flags);
     }
 
     private void show(Tab t) {
@@ -331,6 +460,7 @@ public class MainActivity extends Activity {
     private void closeTab(Tab t) {
         if (t.web != null) webContainer.removeView(t.web);
         tm.remove(t);
+        if (t.incognito && !hasIncognitoTabs()) deleteIncognitoData();
     }
 
     private void openSettings() {
@@ -485,7 +615,8 @@ public class MainActivity extends Activity {
             tabList.addView(note("열린 탭이 없습니다. 위 주소창에 검색어나 주소를 입력하세요."));
         }
         for (Tab t : new ArrayList<>(tm.tabs)) {
-            View row = row(inf, tabList, t.title.isEmpty() ? "새 탭" : t.title, t.url);
+            String title = t.title.isEmpty() ? "새 탭" : t.title;
+            View row = row(inf, tabList, t.incognito ? "[시크릿] " + title : title, t.url);
             row.setOnClickListener(v -> show(t));
             View x = row.findViewById(R.id.remove);
             x.setContentDescription("탭 닫기");
@@ -560,7 +691,9 @@ public class MainActivity extends Activity {
             return;
         }
         if (tm.atHome) {
-            confirmExit();
+            // 탭 목록(메뉴)은 열린 창처럼 닫고 보던 페이지로 돌아간다.
+            tm.atHome = false;
+            render();
             return;
         }
         Tab t = tm.current();
@@ -579,8 +712,7 @@ public class MainActivity extends Activity {
             Tab before = tm.byId(t.backToId);
             closeTab(t);
             if (before != null) tm.select(before);
-            else tm.atHome = true;
-            render();
+            render(); // 그 전에 보던 탭이 없으면 마지막 탭이나 시작 페이지가 대신 남는다
             moveTaskToBack(true);
             return;
         }
@@ -601,8 +733,9 @@ public class MainActivity extends Activity {
         exiting = true;
         tm.save();
         webContainer.removeAllViews();
+        closeAllIncognito();
         tm.destroyAll();
-        tm.atHome = true;
+        tm.atHome = false;
         KeepAliveService.stop(this);
         finishAndRemoveTask();
     }
@@ -620,6 +753,8 @@ public class MainActivity extends Activity {
         PopupMenu pm = new PopupMenu(this, anchor);
         Menu m = pm.getMenu();
         m.add(0, 1, 0, "새 탭");
+        m.add(0, 11, 0, "새 시크릿 탭");
+        m.add(0, 13, 0, "탭 목록·즐겨찾기");
         if (t != null && t.web != null) {
             m.add(0, 2, 0, "새로고침");
             if (t.web.canGoForward()) m.add(0, 3, 0, "앞으로");
@@ -631,15 +766,25 @@ public class MainActivity extends Activity {
             }
             m.add(0, 7, 0, "이 탭 닫기");
         }
+        if (hasIncognitoTabs()) m.add(0, 12, 0, "시크릿 탭 모두 닫기");
         m.add(0, 8, 0, "설정");
         m.add(0, 10, 0, "방문 기록 삭제");
         m.add(0, 9, 0, "로그인 정보 모두 삭제");
         pm.setOnMenuItemClickListener(item -> {
             switch (item.getItemId()) {
                 case 1:
-                    goHome();
-                    urlBox.requestFocus();
-                    getSystemService(InputMethodManager.class).showSoftInput(urlBox, 0);
+                    openNewTab(false);
+                    break;
+                case 11:
+                    openNewTab(true);
+                    break;
+                case 12:
+                    closeAllIncognito();
+                    render();
+                    toast("시크릿 탭을 모두 닫고 기록을 지웠습니다");
+                    break;
+                case 13:
+                    openTabList();
                     break;
                 case 2:
                     t.web.reload();
@@ -665,7 +810,7 @@ public class MainActivity extends Activity {
                     break;
                 case 7:
                     closeTab(t);
-                    goHome();
+                    render();
                     break;
                 case 8:
                     openSettings();
@@ -704,6 +849,14 @@ public class MainActivity extends Activity {
         if (t.web != null) return;
         t.ctx = new MutableContextWrapper(this);
         WebView w = new WebView(t.ctx);
+        // 시크릿 탭은 따로 된 저장소를 쓴다. 다른 어떤 설정보다 먼저 지정해야 한다.
+        if (t.incognito && incognitoSupported()) {
+            try {
+                ProfileStore.getInstance().getOrCreateProfile(INCOGNITO_PROFILE);
+                WebViewCompat.setProfile(w, INCOGNITO_PROFILE);
+            } catch (RuntimeException ignored) {
+            }
+        }
         t.web = w;
         WebSettings s = w.getSettings();
         s.setJavaScriptEnabled(true);
@@ -720,7 +873,8 @@ public class MainActivity extends Activity {
         // 일부 사이트(구글 로그인 등)는 '앱 내 브라우저' 표시가 있으면 로그인을 막는다.
         s.setUserAgentString(WebSettings.getDefaultUserAgent(this)
                 .replace("; wv", "").replace("Version/4.0 ", ""));
-        CookieManager cm = CookieManager.getInstance();
+        if (t.incognito) s.setCacheMode(WebSettings.LOAD_NO_CACHE);
+        CookieManager cm = cookiesFor(t);
         cm.setAcceptCookie(true);
         cm.setAcceptThirdPartyCookies(w, true);
         // 화면에 안 보여도 페이지 프로세스를 정리 대상에서 뺀다.
@@ -793,7 +947,7 @@ public class MainActivity extends Activity {
             tab.url = url;
             if (view.getTitle() != null) tab.title = view.getTitle();
             CookieManager.getInstance().flush(); // 로그인 직후 쿠키를 바로 디스크에 남긴다
-            history.add(tab.title, url);
+            if (!tab.incognito) history.add(tab.title, url);
             onTabChanged(tab);
         }
 
@@ -840,6 +994,7 @@ public class MainActivity extends Activity {
         @Override
         public boolean onCreateWindow(WebView view, boolean isDialog, boolean isUserGesture, Message resultMsg) {
             Tab popup = tm.create("", tab.id);
+            popup.incognito = tab.incognito; // 로그인 팝업은 원래 탭과 같은 저장소를 써야 한다
             ensureWeb(popup);
             ((WebView.WebViewTransport) resultMsg.obj).setWebView(popup.web);
             resultMsg.sendToTarget();
@@ -854,7 +1009,7 @@ public class MainActivity extends Activity {
             closeTab(tab);
             if (wasShowing) {
                 if (opener != null) show(opener);
-                else goHome();
+                else render();
             } else {
                 render();
             }
@@ -1003,7 +1158,6 @@ public class MainActivity extends Activity {
             Tab opener = tm.byId(tab.openerId);
             closeTab(tab);
             if (wasShowing && opener != null) show(opener);
-            else if (wasShowing) goHome();
             else render();
         }
         if (!url.matches("(?i)^https?://.*")) {
@@ -1022,7 +1176,7 @@ public class MainActivity extends Activity {
             }
             DownloadManager.Request req = new DownloadManager.Request(Uri.parse(url));
             if (mime != null && !mime.isEmpty()) req.setMimeType(mime);
-            String cookies = CookieManager.getInstance().getCookie(url);
+            String cookies = cookiesFor(tab).getCookie(url);
             if (cookies != null) req.addRequestHeader("Cookie", cookies);
             req.addRequestHeader("User-Agent", userAgent);
             req.setTitle(name);

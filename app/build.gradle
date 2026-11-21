@@ -11,8 +11,8 @@ android {
         minSdk 26
         // 34를 유지: 35부터는 화면 전체(edge-to-edge) 강제와 포그라운드 서비스 시간 제한이 생긴다.
         targetSdk 34
-        versionCode 10
-        versionName "2.7"
+        versionCode 11
+        versionName "2.8"
     }
 
     // 저장소에는 서명 키를 두지 않는다. app/chromeview.keystore 가 있으면 그 키로,
@@ -42,4 +42,9 @@ android {
     }
 
     lint { checkReleaseBuilds false }
+}
+
+dependencies {
+    // 시크릿 탭을 일반 탭과 다른 저장소(쿠키·사이트 데이터)로 분리하는 데 쓴다.
+    implementation "androidx.webkit:webkit:1.14.0"
 }

@@ -66,6 +66,11 @@ class TabManager {
     void destroyAll() {
         for (Tab t : tabs) {
             if (t.web != null) {
+                if (t.incognito) {
+                    t.web.destroy();
+                    t.web = null;
+                    continue;
+                }
                 Bundle b = new Bundle();
                 t.saved = t.web.saveState(b) != null ? b : null;
                 t.web.destroy();
@@ -85,8 +90,8 @@ class TabManager {
                     Bundle b = new Bundle();
                     state = t.web.saveState(b) != null ? b : null;
                 }
-                // 아무것도 불러오지 않은 빈 팝업은 되살릴 내용이 없다.
-                if (state == null && t.url.isEmpty()) continue;
+                // 시크릿 탭은 디스크에 남기지 않는다. 아무것도 불러오지 않은 빈 팝업도 되살릴 내용이 없다.
+                if (t.incognito || (state == null && t.url.isEmpty())) continue;
                 arr.put(new JSONObject().put("id", t.id).put("opener", t.openerId)
                         .put("title", t.title).put("url", t.url));
                 String name = "state_" + t.id + ".bin";

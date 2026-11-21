@@ -19,7 +19,7 @@ import android.widget.Toast;
 
 /** 설정 화면. 홈(고정 창 목록)에서 열리며, 뒤로가기를 누르면 이전 화면으로 돌아간다. */
 public class SettingsActivity extends Activity {
-    private TextView status, selfState, defaultState;
+    private TextView status, selfState, defaultState, homepageState;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -34,6 +34,8 @@ public class SettingsActivity extends Activity {
         findViewById(R.id.btnBack).setOnClickListener(v -> finish());
         defaultState = findViewById(R.id.defaultState);
         findViewById(R.id.rowDefault).setOnClickListener(v -> askDefaultBrowser());
+        homepageState = findViewById(R.id.homepageState);
+        findViewById(R.id.rowHomepage).setOnClickListener(v -> chooseHomepage());
         findViewById(R.id.rowSelf).setOnClickListener(v -> askBatteryExemption());
         Switch boot = findViewById(R.id.autoStart);
         boot.setChecked(prefs.getBoolean("autoStart", true));
@@ -72,6 +74,7 @@ public class SettingsActivity extends Activity {
                 .isIgnoringBatteryOptimizations(getPackageName());
         selfState.setText(unrestricted ? "완료" : "설정하기");
         defaultState.setText(isDefaultBrowser() ? "완료" : "설정하기");
+        homepageState.setText(homepageLabel(MainActivity.homepage(this)));
         if (getPackageManager().getLaunchIntentForPackage(KeepAliveService.CHROME) == null) {
             status.setText("Chrome 앱을 찾을 수 없습니다. Chrome을 설치하거나 사용 설정해 주세요.");
         } else if (!KeepAliveService.holdingChrome) {
@@ -158,6 +161,55 @@ public class SettingsActivity extends Activity {
         } catch (Exception e) {
             toast("파일을 읽지 못했습니다");
         }
+    }
+
+    private static final String[] HOME_NAMES = {"네이버", "구글", "다음"};
+    private static final String[] HOME_URLS = {MainActivity.DEFAULT_HOMEPAGE, "https://www.google.com", "https://m.daum.net"};
+
+    private static String homepageLabel(String url) {
+        for (int i = 0; i < HOME_URLS.length; i++) if (HOME_URLS[i].equals(url)) return HOME_NAMES[i];
+        String host = Uri.parse(url).getHost();
+        return host == null ? url : host.replaceFirst("^(www|m)\\.", "");
+    }
+
+    private void chooseHomepage() {
+        String[] items = {HOME_NAMES[0], HOME_NAMES[1], HOME_NAMES[2], "직접 입력"};
+        new AlertDialog.Builder(this)
+                .setTitle("시작 페이지")
+                .setItems(items, (d, which) -> {
+                    if (which < HOME_URLS.length) {
+                        saveHomepage(HOME_URLS[which]);
+                        return;
+                    }
+                    android.widget.EditText input = new android.widget.EditText(this);
+                    input.setSingleLine(true);
+                    input.setInputType(android.text.InputType.TYPE_TEXT_VARIATION_URI
+                            | android.text.InputType.TYPE_CLASS_TEXT);
+                    input.setHint("예: m.naver.com");
+                    input.setText(MainActivity.homepage(this));
+                    android.widget.FrameLayout box = new android.widget.FrameLayout(this);
+                    int pad = (int) (20 * getResources().getDisplayMetrics().density);
+                    box.setPadding(pad, pad / 2, pad, 0);
+                    box.addView(input);
+                    new AlertDialog.Builder(this)
+                            .setTitle("시작 페이지 주소")
+                            .setView(box)
+                            .setPositiveButton("저장", (d2, w2) -> {
+                                String text = input.getText().toString().trim();
+                                if (text.isEmpty()) return;
+                                if (!text.matches("(?i)^https?://.*")) text = "https://" + text;
+                                saveHomepage(text);
+                            })
+                            .setNegativeButton("취소", null)
+                            .show();
+                })
+                .setNegativeButton("취소", null)
+                .show();
+    }
+
+    private void saveHomepage(String url) {
+        getSharedPreferences("app", MODE_PRIVATE).edit().putString("homepage", url).apply();
+        homepageState.setText(homepageLabel(url));
     }
 
     private void showDiag() {
