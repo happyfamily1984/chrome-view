@@ -45,6 +45,7 @@ class TabManager {
 
     void select(Tab t) {
         currentId = t.id;
+        t.lastUsed = System.currentTimeMillis();
         atHome = false;
     }
 
@@ -60,6 +61,37 @@ class TabManager {
             t.web = null;
         }
         new File(dir, "state_" + t.id + ".bin").delete();
+    }
+
+    /**
+     * 메모리 절약: 오래 안 본 탭의 페이지를 내리고 기록만 남긴다(Chrome 의 탭 내리기와 같다).
+     * 지금 보는 탭, 그 탭을 연 탭들(로그인 팝업이 돌아갈 곳), 재생 중인 탭, 인증 앱을 기다리는 탭은 남긴다.
+     * 내린 탭은 다시 열 때 새로 불러온다. 내린 개수를 돌려준다.
+     */
+    int discardExtra(int keep, long protectA, long protectB) {
+        java.util.Set<Long> safe = new HashSet<>();
+        for (Tab t = current(); t != null && safe.add(t.id); t = byId(t.openerId)) { }
+        for (long id : new long[]{protectA, protectB}) {
+            for (Tab t = byId(id); t != null && safe.add(t.id); t = byId(t.openerId)) { }
+        }
+        List<Tab> live = new ArrayList<>();
+        for (Tab t : tabs) if (t.web != null && !safe.contains(t.id)) live.add(t);
+        live.sort((a, b) -> Long.compare(b.lastUsed, a.lastUsed));
+        int dropped = 0;
+        for (int i = Math.max(0, keep); i < live.size(); i++) {
+            Tab t = live.get(i);
+            Bundle b = new Bundle();
+            t.saved = t.web.saveState(b) != null ? b : null;
+            if (t.web.getParent() instanceof android.view.ViewGroup) {
+                ((android.view.ViewGroup) t.web.getParent()).removeView(t.web);
+            }
+            t.web.destroy();
+            t.web = null;
+            t.bgScript = null;
+            t.mediaScript = false;
+            dropped++;
+        }
+        return dropped;
     }
 
     /** 메모리의 페이지를 모두 내린다(디스크 저장분은 그대로). */

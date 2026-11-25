@@ -94,6 +94,10 @@ final class MediaHub {
         }
     }
 
+    static long activeTabId() {
+        return tabId;
+    }
+
     static boolean isActiveTab(long id) {
         return id != -1 && id == tabId;
     }

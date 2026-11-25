@@ -127,8 +127,10 @@ public class MainActivity extends Activity {
     private WebChromeClient.CustomViewCallback customCallback;
     private boolean exiting;
     /** 방금 외부 앱(인증 앱 등)을 부른 탭. 그 앱이 링크로 되돌아올 때 이 탭과 이어 준다. */
-    private static long waitingTabId = -1;
-    private static long waitingSince;
+    static long waitingTabId = -1;
+    static long waitingSince;
+    /** 지금 보는 탭 말고 메모리에 살려 둘 탭 수. 46개를 다 살려 두면 휴대폰이 크롬뷰를 통째로 꺼 버린다. */
+    static final int KEEP_ALIVE_TABS = 4;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -339,6 +341,14 @@ public class MainActivity extends Activity {
         getSystemService(InputMethodManager.class).showSoftInput(urlBox, 0);
     }
 
+    /** 오래 안 본 탭을 내려 메모리를 확보한다. 앱(App)의 메모리 경고에서도 부른다. */
+    static void trimTabs(Context c, int keep) {
+        TabManager tabs = App.tabs(c);
+        long waiting = System.currentTimeMillis() - waitingSince < 15 * 60_000 ? waitingTabId : -1;
+        int n = tabs.discardExtra(keep, MediaHub.activeTabId(), waiting);
+        if (n > 0) Diag.log(c, "메모리 절약: 오래 안 본 탭 " + n + "개를 내림 (다시 열면 새로 불러옴)");
+    }
+
     // ───────────────────────── 백그라운드 재생 ─────────────────────────
 
     private boolean backgroundPlayOn() {
@@ -452,6 +462,7 @@ public class MainActivity extends Activity {
     private void show(Tab t) {
         tm.select(t);
         render();
+        trimTabs(this, KEEP_ALIVE_TABS);
     }
 
     /** 주소창에서 이동: 홈에서는 새 탭, 탭을 보고 있으면 그 탭에서 연다. */
@@ -847,6 +858,7 @@ public class MainActivity extends Activity {
         m.add(0, 1, 0, "새 탭");
         m.add(0, 11, 0, "새 시크릿 탭");
         m.add(0, 13, 0, "탭 목록·즐겨찾기");
+        if (tm.tabs.size() > 1) m.add(0, 14, 0, "다른 탭 모두 닫기");
         if (t != null && t.web != null) {
             m.add(0, 2, 0, "새로고침");
             if (t.web.canGoForward()) m.add(0, 3, 0, "앞으로");
@@ -877,6 +889,9 @@ public class MainActivity extends Activity {
                     break;
                 case 13:
                     openTabList();
+                    break;
+                case 14:
+                    confirmCloseOthers();
                     break;
                 case 2:
                     t.web.reload();
@@ -918,6 +933,21 @@ public class MainActivity extends Activity {
             return true;
         });
         pm.show();
+    }
+
+    private void confirmCloseOthers() {
+        Tab keep = tm.atHome ? null : tm.current();
+        int n = tm.tabs.size() - (keep == null ? 0 : 1);
+        new AlertDialog.Builder(this)
+                .setMessage((keep == null ? "열린 탭 " : "지금 보는 탭을 빼고 ") + n + "개를 모두 닫을까요?")
+                .setPositiveButton("닫기", (d, w) -> {
+                    for (Tab t : new ArrayList<>(tm.tabs)) if (t != keep) closeTab(t);
+                    tm.save();
+                    render();
+                    toast(n + "개 탭을 닫았습니다");
+                })
+                .setNegativeButton("취소", null)
+                .show();
     }
 
     private void confirmClearLogins() {

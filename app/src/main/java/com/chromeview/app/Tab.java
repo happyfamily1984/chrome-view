@@ -8,6 +8,8 @@ class Tab {
     long id;
     /** 이 탭을 연 탭(로그인 팝업 등). 없으면 -1. */
     long openerId = -1;
+    /** 마지막으로 이 탭을 본 시각. 메모리가 모자라면 오래 안 본 탭부터 내린다. */
+    long lastUsed = System.currentTimeMillis();
     /** 시크릿 탭: 방문 기록·탭 저장을 남기지 않고, 로그인 정보도 일반 탭과 따로 쓴다. */
     boolean incognito;
     /** 백그라운드 재생용으로 넣어 둔 스크립트(androidx.webkit.ScriptHandler). 없으면 null. */

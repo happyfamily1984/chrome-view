@@ -18,15 +18,26 @@ final class Diag {
     private static final int MAX = 60;
 
     static synchronized void log(Context c, String msg) {
+        write(c, msg, false);
+    }
+
+    private static void write(Context c, String msg, boolean now) {
         try {
             SharedPreferences p = c.getSharedPreferences("diag", Context.MODE_PRIVATE);
             JSONArray old = new JSONArray(p.getString("log", "[]"));
             JSONArray out = new JSONArray();
             for (int i = Math.max(0, old.length() - MAX + 1); i < old.length(); i++) out.put(old.get(i));
             out.put(new SimpleDateFormat("MM-dd HH:mm:ss", Locale.US).format(new Date()) + "  " + msg);
-            p.edit().putString("log", out.toString()).apply();
+            SharedPreferences.Editor e = p.edit().putString("log", out.toString());
+            if (now) e.commit();
+            else e.apply();
         } catch (Exception ignored) {
         }
+    }
+
+    /** 앱이 곧 죽는 상황(오류)에서 쓴다. 바로 디스크에 쓴다. */
+    static synchronized void logNow(Context c, String msg) {
+        write(c, msg, true);
     }
 
     static synchronized String read(Context c) {
