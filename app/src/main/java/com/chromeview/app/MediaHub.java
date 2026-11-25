@@ -33,6 +33,9 @@ final class MediaHub {
     private static String title = "", artist = "";
     private static long durationMs = -1, positionMs = -1;
     private static Bitmap art;
+    /** 사용자가 알림·이어폰으로 마지막에 일시정지를 누른 시각. */
+    private static long userPausedAt;
+    private static final android.os.Handler handler = new android.os.Handler(android.os.Looper.getMainLooper());
 
     private MediaHub() {
     }
@@ -51,6 +54,12 @@ final class MediaHub {
             } else if (!same) {
                 return; // 다른 영상이 멈춘 것은 상관없다
             } else if ("pause".equals(s)) {
+                if (playing && SystemClock.elapsedRealtime() - userPausedAt > 5000
+                        && tab.web instanceof KeepWebView && ((KeepWebView) tab.web).recentlyHidden()) {
+                    // 사용자가 누르지 않았는데 백그라운드로 가자마자 멈췄다: 가려져서 멈춘 것이다.
+                    switchToVisible(c, tab, "멈춤");
+                    return;
+                }
                 playing = false;
             }
             incognito = tab.incognito;
@@ -88,9 +97,49 @@ final class MediaHub {
             return;
         }
         // 페이지의 응답을 기다리는 동안 버튼 모양부터 바꿔 둔다.
+        if ("pause".equals(cmd)) userPausedAt = SystemClock.elapsedRealtime();
         if ("play".equals(cmd) || "pause".equals(cmd)) {
             playing = "play".equals(cmd);
             publish(c.getApplicationContext());
+        }
+    }
+
+    /** 절약 방식으로 백그라운드에 들어간 뒤, 재생 위치가 실제로 흘러가는지 두 번 물어서 확인한다. */
+    static void watchForStall(Context c, KeepWebView view) {
+        Context app = c.getApplicationContext();
+        Tab tab = activeTab;
+        if (tab == null || tab.web != view) return;
+        final long[] first = {-1};
+        handler.postDelayed(() -> ping(tab), 1000);
+        handler.postDelayed(() -> {
+            first[0] = positionMs;
+            ping(tab);
+        }, 2500);
+        handler.postDelayed(() -> {
+            if (activeTab != tab || !playing || !view.recentlyHidden()) return;
+            if (first[0] >= 0 && positionMs >= 0 && positionMs - first[0] < 500) {
+                switchToVisible(app, tab, "진행 안 됨");
+            }
+        }, 4500);
+    }
+
+    private static void ping(Tab tab) {
+        if (activeTab != tab || proxy == null) return;
+        try {
+            proxy.postMessage("ping");
+        } catch (RuntimeException ignored) {
+        }
+    }
+
+    private static void switchToVisible(Context c, Tab tab, String why) {
+        tab.bgNeedsVisible = true;
+        Diag.log(c, "백그라운드에서 재생 " + why + " → 화면 유지 방식으로 바꿔 다시 재생");
+        if (tab.web instanceof KeepWebView) ((KeepWebView) tab.web).wake();
+        if (proxy != null) {
+            try {
+                proxy.postMessage("play");
+            } catch (RuntimeException ignored) {
+            }
         }
     }
 

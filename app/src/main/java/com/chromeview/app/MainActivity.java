@@ -74,6 +74,7 @@ public class MainActivity extends Activity {
             + "try{var ms=navigator.mediaSession;if(ms&&ms.setActionHandler){var o=ms.setActionHandler.bind(ms);"
             + "ms.setActionHandler=function(a,h){hs[a]=h;try{o(a,h);}catch(e){}};}}catch(e){}"
             + "function cmd(ev){var c=String(ev.data);var m=cur||document.querySelector('video,audio');"
+            + "if(c==='ping'){if(m)send('meta',m);return;}"
             + "if(c==='next'){if(hs.nexttrack)hs.nexttrack({action:'nexttrack'});else if(m)m.currentTime+=10;return;}"
             + "if(c==='prev'){if(hs.previoustrack)hs.previoustrack({action:'previoustrack'});"
             + "else if(m)m.currentTime=Math.max(0,m.currentTime-10);return;}"

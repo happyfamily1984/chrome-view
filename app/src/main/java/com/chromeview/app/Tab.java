@@ -16,6 +16,8 @@ class Tab {
     Object bgScript;
     /** 재생 조절 스크립트를 페이지 시작 전에 넣어 두었는지. */
     boolean mediaScript;
+    /** 이 탭의 영상은 가려지면 멈춘다: 백그라운드에서 '화면 유지 방식'을 써야 한다. */
+    boolean bgNeedsVisible;
     /** 다른 앱이 보낸 링크로 열린 탭. 뒤로가기로 끝까지 나가면 그 앱으로 돌아간다. */
     boolean external;
     /** external 탭을 닫았을 때 크롬뷰에서 다시 보여 줄, 그 전에 보던 탭. 없으면 -1(홈). */
