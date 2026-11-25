@@ -259,6 +259,25 @@
                                 <TextView
                                     android:id="@+id/tabsHeader"
                                     style="@style/Section" />
+
+                                <View
+                                    android:layout_width="0dp"
+                                    android:layout_height="1dp"
+                                    android:layout_weight="1" />
+
+                                <TextView
+                                    android:id="@+id/btnKeepRecent"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="40dp"
+                                    android:background="@drawable/bg_btn_outline"
+                                    android:gravity="center"
+                                    android:paddingStart="14dp"
+                                    android:paddingEnd="14dp"
+                                    android:text="최근 5개만 남기기"
+                                    android:textColor="@color/accent"
+                                    android:textSize="13sp"
+                                    android:textStyle="bold"
+                                    android:visibility="gone" />
                             </LinearLayout>
 
                             <LinearLayout

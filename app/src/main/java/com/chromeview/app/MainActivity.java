@@ -131,6 +131,8 @@ public class MainActivity extends Activity {
     static long waitingSince;
     /** 지금 보는 탭 말고 메모리에 살려 둘 탭 수. 46개를 다 살려 두면 휴대폰이 크롬뷰를 통째로 꺼 버린다. */
     static final int KEEP_ALIVE_TABS = 4;
+    /** '최근 탭만 남기기'로 남길 탭 수. */
+    static final int KEEP_RECENT_TABS = 5;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -197,6 +199,7 @@ public class MainActivity extends Activity {
         findViewById(R.id.btnMenu).setOnClickListener(this::showMenu);
         findViewById(R.id.btnSettings).setOnClickListener(v -> openSettings());
         findViewById(R.id.btnChrome).setOnClickListener(v -> confirmOpenChrome());
+        findViewById(R.id.btnKeepRecent).setOnClickListener(v -> confirmKeepRecent());
         urlBox.setOnEditorActionListener((v, actionId, event) -> {
             if (actionId == EditorInfo.IME_ACTION_GO || actionId == EditorInfo.IME_NULL) {
                 String text = urlBox.getText().toString().trim();
@@ -713,6 +716,8 @@ public class MainActivity extends Activity {
         LayoutInflater inf = getLayoutInflater();
         tabList.removeAllViews();
         tabsHeader.setText("열린 탭 " + tm.tabs.size() + "개");
+        findViewById(R.id.btnKeepRecent).setVisibility(
+                tm.tabs.size() > KEEP_RECENT_TABS ? View.VISIBLE : View.GONE);
         if (tm.tabs.isEmpty()) {
             tabList.addView(note("열린 탭이 없습니다. 위 주소창에 검색어나 주소를 입력하세요."));
         }
@@ -858,6 +863,7 @@ public class MainActivity extends Activity {
         m.add(0, 1, 0, "새 탭");
         m.add(0, 11, 0, "새 시크릿 탭");
         m.add(0, 13, 0, "탭 목록·즐겨찾기");
+        if (tm.tabs.size() > KEEP_RECENT_TABS) m.add(0, 15, 0, "최근 탭 " + KEEP_RECENT_TABS + "개만 남기기");
         if (tm.tabs.size() > 1) m.add(0, 14, 0, "다른 탭 모두 닫기");
         if (t != null && t.web != null) {
             m.add(0, 2, 0, "새로고침");
@@ -892,6 +898,9 @@ public class MainActivity extends Activity {
                     break;
                 case 14:
                     confirmCloseOthers();
+                    break;
+                case 15:
+                    confirmKeepRecent();
                     break;
                 case 2:
                     t.web.reload();
@@ -933,6 +942,41 @@ public class MainActivity extends Activity {
             return true;
         });
         pm.show();
+    }
+
+    /**
+     * 최근에 본 탭 5개만 남기고 나머지를 닫는다. 지금 보는 탭(과 그 탭을 연 탭), 재생 중인 탭,
+     * 인증 앱을 기다리는 탭은 5개에 들지 못해도 닫지 않는다.
+     */
+    private void confirmKeepRecent() {
+        java.util.Set<Long> keep = new java.util.HashSet<>();
+        Tab cur = tm.atHome ? null : tm.current();
+        long waiting = System.currentTimeMillis() - waitingSince < 15 * 60_000 ? waitingTabId : -1;
+        for (long id : new long[]{cur == null ? -1 : cur.id, MediaHub.activeTabId(), waiting}) {
+            for (Tab t = tm.byId(id); t != null && keep.add(t.id); t = tm.byId(t.openerId)) { }
+        }
+        List<Tab> recent = new ArrayList<>(tm.tabs);
+        recent.sort((a, b) -> Long.compare(b.lastUsed, a.lastUsed));
+        for (Tab t : recent) {
+            if (keep.size() >= KEEP_RECENT_TABS) break;
+            keep.add(t.id);
+        }
+        List<Tab> close = new ArrayList<>();
+        for (Tab t : tm.tabs) if (!keep.contains(t.id)) close.add(t);
+        if (close.isEmpty()) {
+            toast("정리할 탭이 없습니다");
+            return;
+        }
+        new AlertDialog.Builder(this)
+                .setMessage("최근에 본 탭 " + keep.size() + "개만 남기고 " + close.size() + "개를 닫을까요?")
+                .setPositiveButton("정리", (d, w) -> {
+                    for (Tab t : close) closeTab(t);
+                    tm.save();
+                    render();
+                    toast(close.size() + "개 탭을 닫았습니다");
+                })
+                .setNegativeButton("취소", null)
+                .show();
     }
 
     private void confirmCloseOthers() {

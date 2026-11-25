@@ -124,7 +124,7 @@ class TabManager {
                 }
                 // 시크릿 탭은 디스크에 남기지 않는다. 아무것도 불러오지 않은 빈 팝업도 되살릴 내용이 없다.
                 if (t.incognito || (state == null && t.url.isEmpty())) continue;
-                arr.put(new JSONObject().put("id", t.id).put("opener", t.openerId)
+                arr.put(new JSONObject().put("id", t.id).put("opener", t.openerId).put("used", t.lastUsed)
                         .put("title", t.title).put("url", t.url));
                 String name = "state_" + t.id + ".bin";
                 if (state != null) {
@@ -169,6 +169,8 @@ class TabManager {
                 t.openerId = o.optLong("opener", -1);
                 t.title = o.optString("title");
                 t.url = o.optString("url");
+                // 예전 버전이 저장한 탭은 본 시각이 없다. 그때는 나중에 연 탭(번호가 큰 탭)을 최근으로 친다.
+                t.lastUsed = o.optLong("used", t.id);
                 t.saved = readState(new File(dir, "state_" + t.id + ".bin"));
                 tabs.add(t);
                 nextId = Math.max(nextId, t.id + 1);
