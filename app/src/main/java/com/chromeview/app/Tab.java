@@ -12,6 +12,8 @@ class Tab {
     boolean incognito;
     /** 백그라운드 재생용으로 넣어 둔 스크립트(androidx.webkit.ScriptHandler). 없으면 null. */
     Object bgScript;
+    /** 재생 조절 스크립트를 페이지 시작 전에 넣어 두었는지. */
+    boolean mediaScript;
     /** 다른 앱이 보낸 링크로 열린 탭. 뒤로가기로 끝까지 나가면 그 앱으로 돌아간다. */
     boolean external;
     /** external 탭을 닫았을 때 크롬뷰에서 다시 보여 줄, 그 전에 보던 탭. 없으면 -1(홈). */

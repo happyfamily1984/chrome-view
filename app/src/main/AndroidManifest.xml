@@ -87,6 +87,10 @@
         </activity>
 
         <receiver
+            android:name=".MediaActionReceiver"
+            android:exported="false" />
+
+        <receiver
             android:name=".BootReceiver"
             android:exported="true">
             <intent-filter>

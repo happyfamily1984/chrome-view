@@ -62,6 +62,33 @@ public class MainActivity extends Activity {
     static final String ACTION_OPEN = "com.chromeview.app.OPEN";
     static final String ACTION_SETTINGS = "com.chromeview.app.SETTINGS";
     static final String DEFAULT_HOMEPAGE = "https://m.naver.com";
+    static final String EXTRA_TAB = "tabId";
+
+    /**
+     * 알림창 재생 조절: 영상·음악이 재생/일시정지될 때 앱에 알리고, 알림 버튼 명령을 받아 실행한다.
+     * 소리가 없는 자동 재생 미리보기는 무시한다. 다음/이전은 사이트가 지원하면 다음 곡, 아니면 10초 이동.
+     */
+    private static final String MEDIA_JS = "(function(){"
+            + "if(window.__cvMedia)return;window.__cvMedia=true;"
+            + "var cur=null,hs={},b=null;"
+            + "try{var ms=navigator.mediaSession;if(ms&&ms.setActionHandler){var o=ms.setActionHandler.bind(ms);"
+            + "ms.setActionHandler=function(a,h){hs[a]=h;try{o(a,h);}catch(e){}};}}catch(e){}"
+            + "function cmd(ev){var c=String(ev.data);var m=cur||document.querySelector('video,audio');"
+            + "if(c==='next'){if(hs.nexttrack)hs.nexttrack({action:'nexttrack'});else if(m)m.currentTime+=10;return;}"
+            + "if(c==='prev'){if(hs.previoustrack)hs.previoustrack({action:'previoustrack'});"
+            + "else if(m)m.currentTime=Math.max(0,m.currentTime-10);return;}"
+            + "if(!m)return;if(c==='play'){var r=m.play();if(r&&r.catch)r.catch(function(){});}"
+            + "else if(c==='pause')m.pause();else if(c.indexOf('seek:')===0)m.currentTime=Number(c.slice(5))/1000;}"
+            + "function send(s,m){if(!b){b=window.cvMedia;if(!b)return;b.onmessage=cmd;}"
+            + "try{var md=navigator.mediaSession&&navigator.mediaSession.metadata;"
+            + "b.postMessage(JSON.stringify({s:s,t:(md&&md.title)||document.title||'',"
+            + "a:(md&&md.artist)||location.hostname,d:m.duration,p:m.currentTime}));}catch(e){}}"
+            + "function on(t,s){document.addEventListener(t,function(e){var m=e.target;"
+            + "if(!(m instanceof HTMLMediaElement))return;"
+            + "if(s==='play'){if(m.muted||m.volume===0)return;cur=m;}else if(m!==cur)return;send(s,m);},true);}"
+            + "on('playing','play');on('pause','pause');on('ended','pause');"
+            + "on('seeked','meta');on('durationchange','meta');on('volumechange','meta');"
+            + "})();";
     private static final String INCOGNITO_PROFILE = "incognito";
 
     /**
@@ -335,6 +362,22 @@ public class MainActivity extends Activity {
         }
     }
 
+    /** 페이지(모든 프레임)가 재생 상태를 알려 올 통로와 그 스크립트를 탭에 붙인다. 페이지를 불러오기 전에 해야 한다. */
+    private void attachMediaControls(Tab t) {
+        if (!WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) return;
+        try {
+            Context app = getApplicationContext();
+            WebViewCompat.addWebMessageListener(t.web, "cvMedia", java.util.Collections.singleton("*"),
+                    (view, message, origin, isMainFrame, reply) ->
+                            MediaHub.onReport(app, t, reply, message.getData()));
+            if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
+                WebViewCompat.addDocumentStartJavaScript(t.web, MEDIA_JS, java.util.Collections.singleton("*"));
+                t.mediaScript = true;
+            }
+        } catch (RuntimeException ignored) {
+        }
+    }
+
     // ───────────────────────── 시크릿 모드 ─────────────────────────
 
     private static boolean incognitoSupported() {
@@ -394,7 +437,7 @@ public class MainActivity extends Activity {
         ((android.widget.ImageButton) findViewById(R.id.btnHome)).setImageTintList(tint);
         ((android.widget.ImageButton) findViewById(R.id.btnMenu)).setImageTintList(tint);
         tabCount.setTextColor(fg);
-        tabCount.setBackgroundTintList(tint);
+        tabCount.setBackgroundResource(on ? R.drawable.bg_tabcount_incognito : R.drawable.bg_tabcount);
         getWindow().setStatusBarColor(bar);
         boolean nightUi = (getResources().getConfiguration().uiMode
                 & android.content.res.Configuration.UI_MODE_NIGHT_MASK)
@@ -426,6 +469,13 @@ public class MainActivity extends Activity {
     /** 링크·공유·설정 요청을 처리한다. 화면을 바꿨으면 true. */
     private boolean handleIntent(Intent intent) {
         if (intent == null) return false;
+        if (ACTION_OPEN.equals(intent.getAction()) && intent.hasExtra(EXTRA_TAB)) {
+            Tab t = tm.byId(intent.getLongExtra(EXTRA_TAB, -1));
+            if (t == null) return false;
+            leaveUrlBox();
+            show(t);
+            return true;
+        }
         if (ACTION_SETTINGS.equals(intent.getAction())) {
             render();
             openSettings();
@@ -498,6 +548,7 @@ public class MainActivity extends Activity {
     }
 
     private void closeTab(Tab t) {
+        MediaHub.forgetTab(this, t.id);
         if (t.web != null) webContainer.removeView(t.web);
         tm.remove(t);
         if (t.incognito && !hasIncognitoTabs()) deleteIncognitoData();
@@ -771,6 +822,7 @@ public class MainActivity extends Activity {
     /** 종료해도 탭과 로그인 쿠키는 저장되어 다음 실행 때 되살아난다. */
     private void exitApp() {
         exiting = true;
+        MediaHub.clear(this, true);
         tm.save();
         webContainer.removeAllViews();
         closeAllIncognito();
@@ -920,6 +972,7 @@ public class MainActivity extends Activity {
         // 화면에 안 보여도 페이지 프로세스를 정리 대상에서 뺀다.
         w.setRendererPriorityPolicy(WebView.RENDERER_PRIORITY_IMPORTANT, false);
         applyBackgroundPlay(t);
+        attachMediaControls(t);
         bind(t);
         attach(t);
 
@@ -976,6 +1029,8 @@ public class MainActivity extends Activity {
             tab.url = url;
             // 페이지 시작 전에 넣는 방식을 지원하지 않는 폰: 페이지가 열리는 대로 넣는다.
             if (tab.bgScript == null && backgroundPlayOn()) view.evaluateJavascript(BG_PLAY_JS, null);
+            if (!tab.mediaScript) view.evaluateJavascript(MEDIA_JS, null);
+            MediaHub.forgetTab(MainActivity.this, tab.id); // 다른 페이지로 넘어가면 이전 영상 알림은 내린다
             onTabChanged(tab);
         }
 
@@ -992,12 +1047,14 @@ public class MainActivity extends Activity {
             CookieManager.getInstance().flush(); // 로그인 직후 쿠키를 바로 디스크에 남긴다
             if (!tab.incognito) history.add(tab.title, url);
             if (tab.bgScript == null && backgroundPlayOn()) view.evaluateJavascript(BG_PLAY_JS, null);
+            if (!tab.mediaScript) view.evaluateJavascript(MEDIA_JS, null);
             onTabChanged(tab);
         }
 
         @Override
         public boolean onRenderProcessGone(WebView view, RenderProcessGoneDetail detail) {
             // 메모리 부족으로 페이지 프로세스가 죽은 경우: 앱은 살리고 그 탭만 다시 연다.
+            MediaHub.forgetTab(MainActivity.this, tab.id);
             Diag.log(MainActivity.this, "페이지 프로세스가 " + (detail.didCrash() ? "오류로 죽음" : "시스템에 의해 정리됨")
                     + ": " + Diag.brief(tab.url));
             webContainer.removeView(view);
