@@ -38,36 +38,55 @@ public class App extends Application {
         getSystemService(NotificationManager.class).cancel(MediaHub.NOTIFICATION_ID);
     }
 
-    /** 안드로이드가 기록해 둔, 지난번에 크롬뷰가 꺼진 이유. */
+    /**
+     * 안드로이드가 기록해 둔, 지난번에 크롬뷰 본체가 꺼진 이유.
+     * 같은 앱 이름으로 웹 화면을 그리는 별도 프로세스(isolated)의 기록도 섞여 있어서 본체 것만 고른다.
+     */
     private String lastExitReason() {
         if (android.os.Build.VERSION.SDK_INT < 30) return "";
         try {
             java.util.List<android.app.ApplicationExitInfo> list = getSystemService(android.app.ActivityManager.class)
-                    .getHistoricalProcessExitReasons(getPackageName(), 0, 1);
-            if (list.isEmpty()) return "";
-            android.app.ApplicationExitInfo e = list.get(0);
-            String why;
-            switch (e.getReason()) {
-                case android.app.ApplicationExitInfo.REASON_LOW_MEMORY: why = "메모리 부족"; break;
-                case android.app.ApplicationExitInfo.REASON_CRASH: why = "앱 오류"; break;
-                case android.app.ApplicationExitInfo.REASON_CRASH_NATIVE: why = "앱 오류(네이티브)"; break;
-                case android.app.ApplicationExitInfo.REASON_ANR: why = "응답 없음"; break;
-                case android.app.ApplicationExitInfo.REASON_USER_REQUESTED: why = "사용자·시스템이 강제 종료"; break;
-                case android.app.ApplicationExitInfo.REASON_USER_STOPPED: why = "사용자가 중지"; break;
-                case android.app.ApplicationExitInfo.REASON_SIGNALED: why = "시스템이 종료 신호"; break;
-                case android.app.ApplicationExitInfo.REASON_EXCESSIVE_RESOURCE_USAGE: why = "자원 과다 사용"; break;
-                case android.app.ApplicationExitInfo.REASON_EXIT_SELF: why = "스스로 종료"; break;
-                case android.app.ApplicationExitInfo.REASON_DEPENDENCY_DIED: why = "연결된 앱이 꺼짐"; break;
-                case android.app.ApplicationExitInfo.REASON_PERMISSION_CHANGE: why = "권한 변경"; break;
-                case android.app.ApplicationExitInfo.REASON_FREEZER: why = "시스템이 얼림"; break;
-                default: why = "기타(" + e.getReason() + ")";
+                    .getHistoricalProcessExitReasons(getPackageName(), 0, 30);
+            for (android.app.ApplicationExitInfo e : list) {
+                if (getPackageName().equals(e.getProcessName())) return " · " + describe(e);
             }
-            String desc = e.getDescription() == null ? "" : " " + e.getDescription();
-            if (desc.length() > 60) desc = desc.substring(0, 60) + "…";
-            return " · 이유: " + why + desc + " · 메모리 " + (e.getPss() / 1024) + "MB";
+            return "";
         } catch (RuntimeException ex) {
             return "";
         }
+    }
+
+    private static String describe(android.app.ApplicationExitInfo e) {
+        String why;
+        switch (e.getReason()) {
+            case android.app.ApplicationExitInfo.REASON_LOW_MEMORY: why = "메모리 부족"; break;
+            case android.app.ApplicationExitInfo.REASON_CRASH: why = "앱 오류"; break;
+            case android.app.ApplicationExitInfo.REASON_CRASH_NATIVE: why = "앱 오류(네이티브)"; break;
+            case android.app.ApplicationExitInfo.REASON_ANR: why = "응답 없음"; break;
+            case android.app.ApplicationExitInfo.REASON_USER_REQUESTED: why = "강제 종료(사용자·시스템)"; break;
+            case android.app.ApplicationExitInfo.REASON_USER_STOPPED: why = "사용자가 중지"; break;
+            case android.app.ApplicationExitInfo.REASON_SIGNALED: why = "시스템이 종료 신호"; break;
+            case android.app.ApplicationExitInfo.REASON_EXCESSIVE_RESOURCE_USAGE: why = "자원 과다 사용"; break;
+            case android.app.ApplicationExitInfo.REASON_EXIT_SELF: why = "스스로 종료"; break;
+            case android.app.ApplicationExitInfo.REASON_DEPENDENCY_DIED: why = "연결된 앱이 꺼짐"; break;
+            case android.app.ApplicationExitInfo.REASON_PERMISSION_CHANGE: why = "권한 변경"; break;
+            case android.app.ApplicationExitInfo.REASON_FREEZER: why = "시스템이 얼림"; break;
+            case 16: why = "앱 업데이트"; break;
+            default: why = "기타(" + e.getReason() + ")";
+        }
+        String imp;
+        int i = e.getImportance();
+        if (i <= 100) imp = "화면에 보이던 중";
+        else if (i <= 125) imp = "유지 서비스 실행 중";
+        else if (i <= 230) imp = "눈에 띄는 작업 중";
+        else if (i <= 300) imp = "서비스 중";
+        else imp = "백그라운드(" + i + ")";
+        String desc = e.getDescription() == null ? "" : " " + e.getDescription();
+        if (desc.length() > 80) desc = desc.substring(0, 80) + "…";
+        String when = new java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.US)
+                .format(new java.util.Date(e.getTimestamp()));
+        return "이유: " + why + desc + " · 그때 상태: " + imp + " · 메모리 " + (e.getPss() / 1024) + "MB"
+                + " · 꺼진 시각 " + when;
     }
 
     @Override
