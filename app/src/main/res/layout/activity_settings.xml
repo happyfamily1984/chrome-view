@@ -327,6 +327,37 @@
                     android:textColor="@color/text"
                     android:textSize="16sp" />
             </LinearLayout>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginStart="16dp"
+                android:layout_marginEnd="16dp"
+                android:background="@color/line" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:minHeight="64dp"
+                android:paddingStart="16dp"
+                android:paddingEnd="12dp">
+
+                <ImageView
+                    style="@style/RowIcon"
+                    android:importantForAccessibility="no"
+                    android:src="@drawable/ic_play" />
+
+                <Switch
+                    android:id="@+id/bgPlay"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:minHeight="48dp"
+                    android:text="영상 백그라운드 재생"
+                    android:textColor="@color/text"
+                    android:textSize="16sp" />
+            </LinearLayout>
         </LinearLayout>
 
         <TextView

@@ -64,6 +64,22 @@ public class MainActivity extends Activity {
     static final String DEFAULT_HOMEPAGE = "https://m.naver.com";
     private static final String INCOGNITO_PROFILE = "incognito";
 
+    /**
+     * 백그라운드 재생: 페이지가 '화면에서 가려졌다'는 신호를 받지 못하게 한다. 유튜브 등은 이 신호를 받으면
+     * 영상을 멈추는데, 신호를 막으면 크롬뷰가 뒤로 가거나 화면이 꺼져도 소리가 계속 나온다.
+     */
+    private static final String BG_PLAY_JS = "(function(){"
+            + "if(window.__cvBg)return;window.__cvBg=true;"
+            + "var P=Document.prototype;"
+            + "function def(n,v){try{Object.defineProperty(P,n,{configurable:true,get:function(){return v;}});}catch(e){}}"
+            + "def('hidden',false);def('webkitHidden',false);"
+            + "def('visibilityState','visible');def('webkitVisibilityState','visible');"
+            + "try{P.hasFocus=function(){return true;};}catch(e){}"
+            + "var stop=function(e){e.stopImmediatePropagation();};"
+            + "['visibilitychange','webkitvisibilitychange'].forEach(function(t){"
+            + "window.addEventListener(t,stop,true);document.addEventListener(t,stop,true);});"
+            + "})();";
+
     private static final int REQ_FILE = 1;
     private static final int REQ_MEDIA_PERM = 2;
     private static final Pattern URL_IN_TEXT = Pattern.compile("https?://\\S+");
@@ -179,6 +195,7 @@ public class MainActivity extends Activity {
         KeepAliveService.start(this);
         if (tm != null) {
             favorites = new Favorites(this); // 설정에서 북마크를 가져왔을 수 있다
+            for (Tab t : tm.tabs) if (t.web != null) applyBackgroundPlay(t); // 설정에서 바꿨을 수 있다
             if (tm.atHome) rebuildHome();
         }
     }
@@ -293,6 +310,29 @@ public class MainActivity extends Activity {
         show(t);
         urlBox.requestFocus();
         getSystemService(InputMethodManager.class).showSoftInput(urlBox, 0);
+    }
+
+    // ───────────────────────── 백그라운드 재생 ─────────────────────────
+
+    private boolean backgroundPlayOn() {
+        return getSharedPreferences("app", MODE_PRIVATE).getBoolean("bgPlay", true);
+    }
+
+    /** 설정에 맞춰 탭에 백그라운드 재생 스크립트를 넣거나 뺀다. 바뀐 내용은 다음 페이지부터 적용된다. */
+    private void applyBackgroundPlay(Tab t) {
+        boolean on = backgroundPlayOn();
+        if (!on && t.bgScript != null) {
+            ((androidx.webkit.ScriptHandler) t.bgScript).remove();
+            t.bgScript = null;
+        } else if (on && t.bgScript == null
+                && WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
+            try {
+                // 모든 사이트, 영상이 들어 있는 iframe 안까지 페이지 코드보다 먼저 실행된다.
+                t.bgScript = WebViewCompat.addDocumentStartJavaScript(t.web, BG_PLAY_JS,
+                        java.util.Collections.singleton("*"));
+            } catch (RuntimeException ignored) {
+            }
+        }
     }
 
     // ───────────────────────── 시크릿 모드 ─────────────────────────
@@ -879,6 +919,7 @@ public class MainActivity extends Activity {
         cm.setAcceptThirdPartyCookies(w, true);
         // 화면에 안 보여도 페이지 프로세스를 정리 대상에서 뺀다.
         w.setRendererPriorityPolicy(WebView.RENDERER_PRIORITY_IMPORTANT, false);
+        applyBackgroundPlay(t);
         bind(t);
         attach(t);
 
@@ -933,6 +974,8 @@ public class MainActivity extends Activity {
         @Override
         public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
             tab.url = url;
+            // 페이지 시작 전에 넣는 방식을 지원하지 않는 폰: 페이지가 열리는 대로 넣는다.
+            if (tab.bgScript == null && backgroundPlayOn()) view.evaluateJavascript(BG_PLAY_JS, null);
             onTabChanged(tab);
         }
 
@@ -948,6 +991,7 @@ public class MainActivity extends Activity {
             if (view.getTitle() != null) tab.title = view.getTitle();
             CookieManager.getInstance().flush(); // 로그인 직후 쿠키를 바로 디스크에 남긴다
             if (!tab.incognito) history.add(tab.title, url);
+            if (tab.bgScript == null && backgroundPlayOn()) view.evaluateJavascript(BG_PLAY_JS, null);
             onTabChanged(tab);
         }
 

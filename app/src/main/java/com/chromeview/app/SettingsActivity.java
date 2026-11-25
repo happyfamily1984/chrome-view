@@ -47,6 +47,13 @@ public class SettingsActivity extends Activity {
         Switch pinned = findViewById(R.id.usePinned);
         pinned.setChecked(prefs.getBoolean("usePinned", true));
         pinned.setOnCheckedChangeListener((b, on) -> prefs.edit().putBoolean("usePinned", on).apply());
+        Switch bgPlay = findViewById(R.id.bgPlay);
+        bgPlay.setChecked(prefs.getBoolean("bgPlay", true));
+        bgPlay.setOnCheckedChangeListener((b, on) -> {
+            prefs.edit().putBoolean("bgPlay", on).apply();
+            toast(on ? "새로 여는 페이지부터 적용됩니다. 지금 보는 영상은 새로고침해 주세요."
+                    : "새로고침하거나 새로 여는 페이지부터 꺼집니다.");
+        });
 
         if (firstRun) {
             prefs.edit().putBoolean("setupShown", true).apply();
