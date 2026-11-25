@@ -940,7 +940,7 @@ public class MainActivity extends Activity {
     private void ensureWeb(Tab t) {
         if (t.web != null) return;
         t.ctx = new MutableContextWrapper(this);
-        WebView w = new WebView(t.ctx);
+        WebView w = new KeepWebView(t.ctx, t);
         // 시크릿 탭은 따로 된 저장소를 쓴다. 다른 어떤 설정보다 먼저 지정해야 한다.
         if (t.incognito && incognitoSupported()) {
             try {

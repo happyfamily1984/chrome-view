@@ -28,6 +28,7 @@ final class MediaHub {
     private static MediaSession session;
     private static JavaScriptReplyProxy proxy;
     private static long tabId = -1;
+    private static Tab activeTab;
     private static boolean playing, incognito;
     private static String title = "", artist = "";
     private static long durationMs = -1, positionMs = -1;
@@ -44,6 +45,7 @@ final class MediaHub {
             boolean same = tab.id == tabId && from == proxy;
             if ("play".equals(s)) {
                 tabId = tab.id;
+                activeTab = tab;
                 proxy = from;
                 playing = true;
             } else if (!same) {
@@ -74,6 +76,11 @@ final class MediaHub {
             clear(c, false); // 앱이 다시 시작돼 대상 영상이 없다
             return;
         }
+        if (("play".equals(cmd) || cmd.startsWith("seek:")) && activeTab != null
+                && activeTab.web instanceof KeepWebView) {
+            ((KeepWebView) activeTab.web).wake();
+        }
+        Diag.log(c, "알림창 재생 조절: " + cmd);
         try {
             proxy.postMessage(cmd);
         } catch (RuntimeException e) {
@@ -85,6 +92,10 @@ final class MediaHub {
             playing = "play".equals(cmd);
             publish(c.getApplicationContext());
         }
+    }
+
+    static boolean isActiveTab(long id) {
+        return id != -1 && id == tabId;
     }
 
     /** 탭이 닫히거나 다른 페이지로 넘어가면 그 탭의 알림을 내린다. */
@@ -99,8 +110,11 @@ final class MediaHub {
             } catch (RuntimeException ignored) {
             }
         }
+        Tab was = activeTab;
         proxy = null;
         tabId = -1;
+        activeTab = null;
+        if (was != null && was.web instanceof KeepWebView) ((KeepWebView) was.web).release();
         playing = false;
         if (session != null) session.setActive(false);
         c.getSystemService(NotificationManager.class).cancel(NOTIFICATION_ID);
