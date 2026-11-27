@@ -268,7 +268,6 @@ public class MainActivity extends Activity {
     // ───────────────────────── 화면 전환 ─────────────────────────
 
     private void render() {
-        tabCount.setText(String.valueOf(tm.tabs.size()));
         Tab t = null;
         if (!tm.atHome) {
             t = tm.current();
@@ -276,10 +275,11 @@ public class MainActivity extends Activity {
                 // 보던 화면이 없으면 메뉴가 아니라 마지막 탭, 그것도 없으면 시작 페이지를 연다.
                 t = tm.tabs.isEmpty() ? tm.create(homepage(this), -1) : tm.tabs.get(tm.tabs.size() - 1);
                 tm.select(t);
-                tabCount.setText(String.valueOf(tm.tabs.size()));
             }
         }
         applyIncognitoLook(t != null && t.incognito);
+        // Chrome 처럼 탭 수는 일반/시크릿을 따로 센다: 시크릿 탭을 보고 있으면 시크릿 탭 수.
+        tabCount.setText(String.valueOf(countTabs(t != null && t.incognito)));
         if (t == null) {
             home.setVisibility(View.VISIBLE);
             webContainer.setVisibility(View.GONE);
@@ -427,6 +427,12 @@ public class MainActivity extends Activity {
                 }
             }, 1500);
         }
+    }
+
+    private int countTabs(boolean incognito) {
+        int n = 0;
+        for (Tab t : tm.tabs) if (t.incognito == incognito) n++;
+        return n;
     }
 
     private boolean hasIncognitoTabs() {
@@ -705,7 +711,7 @@ public class MainActivity extends Activity {
     // ───────────────────────── 홈 화면 ─────────────────────────
 
     private void rebuildHome() {
-        tabCount.setText(String.valueOf(tm.tabs.size()));
+        tabCount.setText(String.valueOf(countTabs(false)));
         boolean unrestricted = getSystemService(PowerManager.class)
                 .isIgnoringBatteryOptimizations(getPackageName());
         status.setText(unrestricted
@@ -716,22 +722,41 @@ public class MainActivity extends Activity {
 
         LayoutInflater inf = getLayoutInflater();
         tabList.removeAllViews();
-        tabsHeader.setText("열린 탭 " + tm.tabs.size() + "개");
+        int normal = countTabs(false), secret = countTabs(true);
+        tabsHeader.setText("열린 탭 " + normal + "개");
         findViewById(R.id.btnKeepRecent).setVisibility(
                 tm.tabs.size() > KEEP_RECENT_TABS ? View.VISIBLE : View.GONE);
-        if (tm.tabs.isEmpty()) {
+        if (normal == 0) {
             tabList.addView(note("열린 탭이 없습니다. 위 주소창에 검색어나 주소를 입력하세요."));
         }
-        for (Tab t : new ArrayList<>(tm.tabs)) {
-            String title = t.title.isEmpty() ? "새 탭" : t.title;
-            View row = row(inf, tabList, t.incognito ? "[시크릿] " + title : title, t.url);
-            row.setOnClickListener(v -> show(t));
-            View x = row.findViewById(R.id.remove);
-            x.setContentDescription("탭 닫기");
-            x.setOnClickListener(v -> {
-                closeTab(t);
-                rebuildHome();
-            });
+        // 일반 탭 먼저, 그 아래 시크릿 탭을 따로 묶어 보여 준다.
+        for (int pass = 0; pass < 2; pass++) {
+            boolean incognitoPass = pass == 1;
+            if (incognitoPass) {
+                if (secret == 0) break;
+                TextView h = new TextView(this);
+                h.setText("시크릿 탭 " + secret + "개");
+                h.setTextSize(17);
+                h.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+                h.setTextColor(getColor(R.color.text));
+                int pad = (int) (16 * getResources().getDisplayMetrics().density);
+                h.setPadding(pad, pad, pad, pad / 2);
+                tabList.addView(h);
+            }
+            LinearLayout group = new LinearLayout(this);
+            group.setOrientation(LinearLayout.VERTICAL);
+            tabList.addView(group);
+            for (Tab t : new ArrayList<>(tm.tabs)) {
+                if (t.incognito != incognitoPass) continue;
+                View row = row(inf, group, t.title.isEmpty() ? "새 탭" : t.title, t.url);
+                row.setOnClickListener(v -> show(t));
+                View x = row.findViewById(R.id.remove);
+                x.setContentDescription("탭 닫기");
+                x.setOnClickListener(v -> {
+                    closeTab(t);
+                    rebuildHome();
+                });
+            }
         }
 
         favList.removeAllViews();
@@ -1243,8 +1268,17 @@ public class MainActivity extends Activity {
             }
             customView = view;
             customCallback = callback;
+            // 전체화면 영상은 화면 맨 바깥(창 전체)에 붙인다. 앱 화면 안에 두면 상태 표시줄 자리만큼
+            // 위쪽 여백이 남아 하얀 띠로 보인다.
+            ViewGroup decor = (ViewGroup) getWindow().getDecorView();
+            if (fullscreen.getParent() != decor) {
+                ((ViewGroup) fullscreen.getParent()).removeView(fullscreen);
+                decor.addView(fullscreen, new FrameLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+            }
             fullscreen.addView(view);
             fullscreen.setVisibility(View.VISIBLE);
+            fullscreen.bringToFront();
             setVideoFullscreen(true);
         }
 
@@ -1264,7 +1298,11 @@ public class MainActivity extends Activity {
                 ? WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
                 : WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_DEFAULT;
         getWindow().setAttributes(lp);
+        if (on) getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
+        else getWindow().clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
         if (android.os.Build.VERSION.SDK_INT >= 30) {
+            // 막대 자리까지 창을 넓혀야 숨긴 뒤 빈 자리가 남지 않는다.
+            getWindow().setDecorFitsSystemWindows(!on);
             android.view.WindowInsetsController c = getWindow().getInsetsController();
             if (c == null) return;
             if (on) {
