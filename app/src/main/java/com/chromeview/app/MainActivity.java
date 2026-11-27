@@ -1245,7 +1245,7 @@ public class MainActivity extends Activity {
             customCallback = callback;
             fullscreen.addView(view);
             fullscreen.setVisibility(View.VISIBLE);
-            getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
+            setVideoFullscreen(true);
         }
 
         @Override
@@ -1254,11 +1254,46 @@ public class MainActivity extends Activity {
         }
     }
 
+    /**
+     * 영상 전체화면: 위쪽 상태 표시줄과 하단(가로일 때는 옆) 탐색 막대를 모두 숨긴다.
+     * 화면 가장자리에서 밀면 잠깐 나타났다가 다시 사라진다. 카메라 구멍 쪽까지 영상을 채운다.
+     */
+    private void setVideoFullscreen(boolean on) {
+        WindowManager.LayoutParams lp = getWindow().getAttributes();
+        lp.layoutInDisplayCutoutMode = on
+                ? WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+                : WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_DEFAULT;
+        getWindow().setAttributes(lp);
+        if (android.os.Build.VERSION.SDK_INT >= 30) {
+            android.view.WindowInsetsController c = getWindow().getInsetsController();
+            if (c == null) return;
+            if (on) {
+                c.setSystemBarsBehavior(android.view.WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+                c.hide(android.view.WindowInsets.Type.systemBars());
+            } else {
+                c.show(android.view.WindowInsets.Type.systemBars());
+            }
+        } else {
+            View decor = getWindow().getDecorView();
+            int hideFlags = View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                    | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
+            int flags = decor.getSystemUiVisibility();
+            decor.setSystemUiVisibility(on ? flags | hideFlags : flags & ~hideFlags);
+        }
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        // 알림창·대화상자를 닫고 돌아왔을 때 막대가 다시 보이면 숨긴다.
+        if (hasFocus && customView != null) setVideoFullscreen(true);
+    }
+
     private void hideCustomView() {
         if (customView == null) return;
         fullscreen.removeAllViews();
         fullscreen.setVisibility(View.GONE);
-        getWindow().clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
+        setVideoFullscreen(false);
         customView = null;
         WebChromeClient.CustomViewCallback cb = customCallback;
         customCallback = null;

@@ -5,7 +5,7 @@
 ## 코드 위치
 
 - 작업 브랜치: `ccr-8b5eb7d2-6jv7vs` (아직 `main`에 합치지 않음)
-- 마지막 배포 버전: 3.4 (`dist/chromeview.apk`)
+- 마지막 배포 버전: 3.5 (`dist/chromeview.apk`)
 
 ## 서명 키 (가장 중요)
 
